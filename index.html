@@ -322,19 +322,39 @@
         let currencyPools = {};
         let users = [];
         let roles = {};
-        let currentUser = null;
+        let currentUser = null; // This will hold the full user object from Firestore
+        let authUser = null; // This will hold the auth object from Firebase Auth
+        
         let unsubscribeTransactions, unsubscribeUsers, unsubscribeRoles;
 
+        // --- APP INITIALIZATION STATE ---
+        let rolesLoaded = false;
+        let usersLoaded = false;
+        let appInitialized = false;
+
         // --- CORE APP LOGIC ---
-        function main(user) {
-            currentUser = user;
-            if (currentUser) {
-                console.log("Authenticated user:", currentUser.uid);
-                setupRealtimeListeners();
+        function checkAndInitializeApp() {
+            // This function runs after each data type is loaded.
+            // It only initializes the main UI when ALL required data is ready.
+            if (rolesLoaded && usersLoaded && !appInitialized) {
+                appInitialized = true; // Prevent this from running again
+                
+                // Find the full user profile from Firestore and merge with auth data
+                const userProfile = users.find(u => u.email === authUser.email) || users[0]; // Fallback to first user for demo
+                if (userProfile) {
+                    currentUser = { ...authUser, ...userProfile };
+                } else {
+                    // Handle case where user exists in Auth but not in Firestore DB
+                    // For now, we'll assign a default role or show an error
+                    console.warn("User profile not found in Firestore, assigning default permissions.");
+                    currentUser = authUser;
+                    currentUser.role = 'Analyst'; // Default fallback role
+                }
+
+                console.log("App is ready! Initializing UI with user:", currentUser);
+                
                 document.getElementById('loading-overlay').style.display = 'none';
                 initializeUI();
-            } else {
-                console.log("User is not authenticated.");
             }
         }
 
@@ -348,7 +368,7 @@
 
         // --- REALTIME LISTENERS ---
         function setupRealtimeListeners() {
-            const appId = firebaseConfig.projectId; // Use projectId for path
+            const appId = firebaseConfig.projectId;
             const transactionsRef = collection(db, `artifacts/${appId}/public/data/transactions`);
             const usersRef = collection(db, `artifacts/${appId}/public/data/users`);
             const rolesRef = collection(db, `artifacts/${appId}/public/data/roles`);
@@ -364,14 +384,17 @@
                     };
                 });
                 processAllTransactionsForPools();
-                filterAndRenderTransactions();
-                updateDashboardView();
+                if(appInitialized) { // Only update UI if app is already running
+                    filterAndRenderTransactions();
+                    updateDashboardView();
+                }
             });
 
             if (unsubscribeUsers) unsubscribeUsers();
             unsubscribeUsers = onSnapshot(usersRef, (snapshot) => {
                 users = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                renderUsersTable();
+                usersLoaded = true;
+                checkAndInitializeApp(); // Check if we can start the app
             });
 
             if (unsubscribeRoles) unsubscribeRoles();
@@ -380,7 +403,8 @@
                 snapshot.docs.forEach(doc => {
                     roles[doc.id] = { id: doc.id, ...doc.data() };
                 });
-                renderRolesSection();
+                rolesLoaded = true;
+                checkAndInitializeApp(); // Check if we can start the app
             });
         }
         
@@ -532,6 +556,7 @@
             }
 
             updateDashboardView = function() {
+                if(!appInitialized) return; // Don't update view if app is not ready
                 const data = filterDashboardData();
                 renderKPIs(data);
                 renderSalesProfitChart(data);
@@ -671,6 +696,7 @@
         }
 
         function filterAndRenderTransactions() {
+            if(!appInitialized) return;
             filteredTransactions = getFilteredData().sort((a, b) => b.orderdate - a.orderdate);
             renderTransactionsTable();
             renderPagination();
@@ -906,7 +932,9 @@
         }
 
         function hasPermission(permission) {
-            if (!currentUser || !currentUser.role || !roles[currentUser.role]) return false;
+            if (!currentUser || !currentUser.role || !roles[currentUser.role]) {
+                return false;
+            }
             return roles[currentUser.role].permissions.includes(permission);
         }
 
@@ -1042,7 +1070,8 @@
 
             onAuthStateChanged(auth, (user) => {
                 if (user) {
-                    main(user);
+                    authUser = user; // Store the auth user
+                    setupRealtimeListeners(); // Start listening for data
                 } else {
                     signInAnonymously(auth).catch((error) => {
                         console.error("Anonymous sign-in failed:", error);
