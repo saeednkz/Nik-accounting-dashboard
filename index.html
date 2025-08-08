@@ -367,6 +367,7 @@
         // --- CORE APP LOGIC ---
         async function initializeAppForUser(user) {
             authUser = user;
+            appInitialized = false; // Reset initialization flag
             const appId = firebaseConfig.projectId;
             const rolesRef = collection(db, `artifacts/${appId}/public/data/roles`);
             const usersRef = collection(db, `artifacts/${appId}/public/data/users`);
@@ -381,34 +382,33 @@
             const usersSnapshot = await getDocs(usersRef);
             users = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-            // Seed database if empty
+            // Seed roles if empty, then re-trigger auth state change to re-run this function
             if (rolesSnapshot.empty) {
                 console.log("No roles found. Creating default Admin role...");
                 await setDoc(doc(rolesRef, "Admin"), { name: 'ادمین کل', permissions: Object.keys(allPermissions) });
-                // No need to return, the data will be re-fetched on next login attempt
-            }
-            if (usersSnapshot.empty) {
-                console.log("No users found. Creating default Admin user in Firestore (Auth user should be created manually)...");
-                const defaultUser = {
-                    name: 'کاربر ادمین',
-                    email: 'admin@example.com',
-                    role: 'Admin',
-                    uid: 'MANUALLY_ADD_UID_FROM_AUTH_CONSOLE' // IMPORTANT
-                };
-                await addDoc(usersRef, defaultUser);
+                // This will cause the roles listener to fire, which will re-run the logic
+                return; 
             }
 
-            const userProfile = users.find(u => u.uid === authUser.uid);
-            if (userProfile) {
-                currentUser = { ...authUser, ...userProfile };
-            } else {
-                console.warn(`User profile for ${authUser.email} not found in Firestore. Logging out.`);
-                handleLogout();
-                loginError.textContent = "پروفایل کاربری شما در پایگاه داده یافت نشد.";
-                loginError.classList.remove('hidden');
+            let userProfile = users.find(u => u.uid === authUser.uid);
+
+            // If user profile doesn't exist in Firestore, create it.
+            if (!userProfile) {
+                console.log(`User profile for ${authUser.email} not found. Creating one now...`);
+                const isFirstUser = users.length === 0;
+                const newUserProfile = {
+                    name: authUser.displayName || authUser.email.split('@')[0],
+                    email: authUser.email,
+                    role: isFirstUser ? 'Admin' : 'Analyst', // First user becomes Admin
+                    uid: authUser.uid
+                };
+                await addDoc(usersRef, newUserProfile);
+                // After adding, the user listener will fire and re-run the logic with the new user.
                 return;
             }
-
+            
+            currentUser = { ...authUser, ...userProfile };
+            
             console.log("App is ready! Initializing UI with user:", currentUser);
             appInitialized = true;
             
