@@ -1,0 +1,1066 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>داشبورد حسابداری - متصل به Firebase</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- jQuery (dependency for Persian Datepicker) -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+    <!-- Persian Datepicker -->
+    <link rel="stylesheet" href="https://unpkg.com/persian-datepicker@1.2.0/dist/css/persian-datepicker.min.css"/>
+    <script src="https://unpkg.com/persian-date@1.1.0/dist/persian-date.min.js"></script>
+    <script src="https://unpkg.com/persian-datepicker@1.2.0/dist/js/persian-datepicker.min.js"></script>
+    
+    <!-- Google Fonts: Vazirmatn -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Custom Styles -->
+    <style>
+        body {
+            font-family: 'Vazirmatn', sans-serif;
+            background-color: #020617; /* slate-950 */
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100%25' height='100%25' viewBox='0 0 1600 800'%3E%3Cg %3E%3Cpolygon fill='%2308102b' points='1600 160 0 460 0 350 1600 50'/%3E%3Cpolygon fill='%230e193f' points='1600 260 0 560 0 450 1600 150'/%3E%3Cpolygon fill='%23142353' points='1600 360 0 660 0 550 1600 250'/%3E%3Cpolygon fill='%231a2d67' points='1600 460 0 760 0 650 1600 350'/%3E%3Cpolygon fill='%2320377B' points='1600 800 0 800 0 750 1600 450'/%3E%3C/g%3E%3C/svg%3E");
+            background-attachment: fixed;
+            background-size: cover;
+        }
+        .glass-card {
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
+            -webkit-backdrop-filter: blur(20px);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+        }
+        select, input[type="text"], input[type="number"], textarea, input[type="password"], input[type="email"] {
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+        }
+        select {
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%2364748b' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+            background-position: left 0.5rem center;
+            background-repeat: no-repeat;
+            background-size: 1.5em 1.5em;
+            padding-left: 2.5rem;
+        }
+        .fade-in { animation: fadeIn 0.5s ease-out forwards; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        main::-webkit-scrollbar, .table-container::-webkit-scrollbar, .modal-body::-webkit-scrollbar { 
+            width: 6px;
+        }
+        main::-webkit-scrollbar-thumb, .table-container::-webkit-scrollbar-thumb, .modal-body::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 10px;
+        }
+        main, .table-container, .modal-body { scrollbar-width: thin; scrollbar-color: #475569 #020617; }
+        .nav-link.active { background-color: rgba(34, 211, 238, 0.1); color: #67e8f9; }
+        .page-content { display: none; }
+        .page-content.active { display: block; animation: fadeIn 0.3s ease-out; }
+        .modal { transition: opacity 0.3s ease, visibility 0.3s ease; }
+        .modal.hidden { opacity: 0; visibility: hidden; }
+        .pwt-btn-today, .pwt-btn-switch, .pwt-btn-close { color: #cbd5e1 !important; }
+        .datepicker-plot-area { background-color: #1e293b !important; border-color: #334155 !important; }
+        .datepicker-plot-area .datepicker-calendar .day-names span, .datepicker-plot-area .datepicker-calendar .month-grid span { color: #94a3b8 !important; }
+        .datepicker-plot-area .datepicker-calendar .day-items span:hover { background-color: #334155 !important; }
+        .datepicker-plot-area .datepicker-calendar .day-items span.selected { background-color: #0ea5e9 !important; color: #fff !important; }
+        .datepicker-plot-area .datepicker-navigator .pwt-btn-next, .datepicker-plot-area .datepicker-navigator .pwt-btn-prev { color: #94a3b8 !important; }
+    </style>
+</head>
+<body class="text-slate-300">
+
+    <div id="loading-overlay" class="fixed inset-0 bg-slate-950 z-[100] flex flex-col items-center justify-center">
+        <svg class="animate-spin h-10 w-10 text-cyan-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        <p class="mt-4 text-slate-400">در حال بارگذاری و اتصال به سرور...</p>
+    </div>
+
+    <div class="flex h-screen p-4 gap-4">
+        <!-- Sidebar -->
+        <aside class="w-20 shrink-0 glass-card rounded-2xl flex flex-col items-center py-6 transition-all duration-300 group hover:w-64">
+             <div class="flex items-center justify-center h-12 mb-8">
+                <svg class="h-9 w-9 text-cyan-400 shrink-0" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18.5 8.5C18.5 9.88071 17.3807 11 16 11H8C6.61929 11 5.5 9.88071 5.5 8.5C5.5 7.11929 6.61929 6 8 6H16C17.3807 6 18.5 7.11929 18.5 8.5Z" stroke="currentColor" stroke-width="1.5"/><path d="M18.5 15.5C18.5 16.8807 17.3807 18 16 18H8C6.61929 18 5.5 16.8807 5.5 15.5C5.5 14.1193 6.61929 13 8 13H16C17.3807 13 18.5 14.1193 18.5 15.5Z" stroke="currentColor" stroke-width="1.5"/><path d="M12 3V21" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <h1 class="text-2xl font-bold mr-4 text-slate-100 opacity-0 max-w-0 group-hover:opacity-100 group-hover:max-w-xs transition-all duration-300 whitespace-nowrap overflow-hidden">حسابداری</h1>
+            </div>
+            <nav class="flex flex-col space-y-3 w-full px-4">
+                <a href="#" id="nav-dashboard" class="nav-link flex items-center p-3 rounded-lg text-slate-400 hover:bg-slate-700/50">
+                    <svg class="h-6 w-6 shrink-0" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 3H4V10H10V3Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 3H14V10H20V3Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 14H4V21H10V14Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 14H14V21H20V14Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    <span class="mr-4 opacity-0 max-w-0 group-hover:opacity-100 group-hover:max-w-full transition-all duration-300 whitespace-nowrap overflow-hidden">داشبورد</span>
+                </a>
+                <a href="#" id="nav-transactions" class="nav-link flex items-center p-3 rounded-lg text-slate-400 hover:bg-slate-700/50">
+                    <svg class="h-6 w-6 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 7.5L7.5 3m0 0L12 7.5M7.5 3v13.5m13.5 0L16.5 21m0 0L12 16.5m4.5 4.5V7.5" /></svg>
+                    <span class="mr-4 opacity-0 max-w-0 group-hover:opacity-100 group-hover:max-w-full transition-all duration-300 whitespace-nowrap overflow-hidden">تراکنش‌ها</span>
+                </a>
+                <a href="#" id="nav-pools" class="nav-link flex items-center p-3 rounded-lg text-slate-400 hover:bg-slate-700/50">
+                    <svg class="h-6 w-6 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 7.5l-2.25-1.313M21 7.5v2.25m0-2.25l-2.25 1.313M3 7.5l2.25-1.313M3 7.5l2.25 1.313M3 7.5v2.25m9 3l2.25-1.313M12 12.75l-2.25-1.313M12 12.75V15m0-2.25l2.25 1.313M8.25 9.75l2.25-1.313M8.25 9.75l2.25 1.313M8.25 9.75V7.5m7.5 3l-2.25-1.313M15.75 9.75l-2.25 1.313m0-2.626V7.5" /></svg>
+                    <span class="mr-4 opacity-0 max-w-0 group-hover:opacity-100 group-hover:max-w-full transition-all duration-300 whitespace-nowrap overflow-hidden">استخر ارزها</span>
+                </a>
+                 <a href="#" id="nav-users" class="nav-link flex items-center p-3 rounded-lg text-slate-400 hover:bg-slate-700/50">
+                    <svg class="h-6 w-6 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-4.663M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0z" /></svg>
+                    <span class="mr-4 opacity-0 max-w-0 group-hover:opacity-100 group-hover:max-w-full transition-all duration-300 whitespace-nowrap overflow-hidden">مدیریت کاربران</span>
+                </a>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 overflow-y-auto">
+            <!-- Dashboard Page -->
+            <div id="page-dashboard" class="page-content">
+                <div class="flex flex-col h-full">
+                    <header class="flex-shrink-0 flex flex-wrap items-center justify-between gap-4 mb-6">
+                        <div class="flex items-center gap-4">
+                            <h2 class="text-3xl font-bold text-slate-100">داشبورد تحلیلی</h2>
+                            <div id="current-datetime" class="hidden lg:flex items-center gap-2 text-slate-400 text-sm glass-card px-3 py-2 rounded-lg"></div>
+                        </div>
+                        <div class="flex items-center gap-3 p-2 glass-card rounded-xl">
+                            <select id="interval-type-filter" class="bg-slate-800/50 border border-slate-700 text-slate-300 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block w-full p-2.5"></select>
+                            <select id="year-filter" class="bg-slate-800/50 border border-slate-700 text-slate-300 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block w-full p-2.5"></select>
+                            <select id="period-filter" class="bg-slate-800/50 border border-slate-700 text-slate-300 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block w-full p-2.5"></select>
+                        </div>
+                    </header>
+                    <div id="kpi-grid" class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-4 gap-4 mb-6"></div>
+                    <div class="grid grid-cols-1 lg:grid-cols-5 gap-6 flex-grow">
+                        <div class="lg:col-span-3 glass-card p-6 rounded-2xl flex flex-col">
+                            <h3 id="sales-profit-chart-title" class="text-lg font-semibold mb-4 text-slate-100">مقایسه فروش و سود</h3>
+                            <div class="flex-grow min-h-[300px]"><canvas id="salesProfitChart"></canvas></div>
+                        </div>
+                        <div class="lg:col-span-2 glass-card p-6 rounded-2xl flex flex-col">
+                            <h3 id="profit-composition-chart-title" class="text-lg font-semibold mb-4 text-slate-100">ترکیب سود خالص</h3>
+                            <div class="flex-grow flex items-center justify-center min-h-[300px]"><canvas id="profitCompositionChart" style="max-height: 280px;"></canvas></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Transactions Page -->
+            <div id="page-transactions" class="page-content">
+                <div class="flex flex-col h-full">
+                    <header class="flex-shrink-0 flex flex-wrap items-center justify-between gap-4 mb-6">
+                        <h2 class="text-3xl font-bold text-slate-100">مدیریت تراکنش‌ها</h2>
+                        <div class="flex items-center gap-3">
+                            <button id="export-csv-btn" class="bg-emerald-500 text-slate-900 font-semibold px-5 py-2.5 rounded-lg flex items-center gap-2 hover:bg-emerald-400 transition-colors">
+                                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
+                                <span>خروجی CSV</span>
+                            </button>
+                            <button id="add-transaction-btn" class="bg-cyan-500 text-slate-900 font-semibold px-5 py-2.5 rounded-lg flex items-center gap-2 hover:bg-cyan-400 transition-colors">
+                                <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z" /></svg>
+                                <span>افزودن تراکنش</span>
+                            </button>
+                        </div>
+                    </header>
+                    
+                    <div class="glass-card p-4 rounded-xl mb-6">
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <input type="text" id="tx-search-input" placeholder="جستجو در ID سفارش، موبایل، ایمیل..." class="bg-slate-800/50 border border-slate-700 text-slate-300 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block w-full p-2.5">
+                            <input type="text" id="tx-start-date" placeholder="از تاریخ" class="persian-datepicker bg-slate-800/50 border border-slate-700 text-slate-300 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block w-full p-2.5">
+                            <input type="text" id="tx-end-date" placeholder="تا تاریخ" class="persian-datepicker bg-slate-800/50 border border-slate-700 text-slate-300 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block w-full p-2.5">
+                            <select id="tx-type-filter" class="bg-slate-800/50 border border-slate-700 text-slate-300 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block w-full p-2.5">
+                                <option value="">همه انواع</option><option value="buy">خرید از مشتری</option><option value="sell">فروش به مشتری</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="flex-grow glass-card rounded-2xl overflow-hidden flex flex-col">
+                        <div class="table-container overflow-x-auto flex-grow">
+                            <table class="w-full text-sm text-right text-slate-400">
+                                <thead class="text-xs text-slate-300 uppercase bg-slate-800/60 sticky top-0 z-10">
+                                    <tr>
+                                        <th scope="col" class="px-4 py-3 whitespace-nowrap">ID سفارش</th>
+                                        <th scope="col" class="px-4 py-3 whitespace-nowrap">تاریخ</th>
+                                        <th scope="col" class="px-4 py-3 whitespace-nowrap">کاربر</th>
+                                        <th scope="col" class="px-4 py-3 whitespace-nowrap">نوع</th>
+                                        <th scope="col" class="px-4 py-3 whitespace-nowrap">ارز</th>
+                                        <th scope="col" class="px-4 py-3 whitespace-nowrap">مقدار ارز</th>
+                                        <th scope="col" class="px-4 py-3 whitespace-nowrap">مبلغ کل</th>
+                                        <th scope="col" class="px-4 py-3 whitespace-nowrap">سود خالص</th>
+                                        <th scope="col" class="px-4 py-3 whitespace-nowrap">عملیات</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="transactions-table-body"></tbody>
+                            </table>
+                        </div>
+                        <div id="tx-pagination" class="flex justify-between items-center p-4 border-t border-slate-700/50"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pools Page -->
+            <div id="page-pools" class="page-content">
+                 <div class="flex flex-col h-full">
+                    <header class="flex-shrink-0 flex flex-wrap items-center justify-between gap-4 mb-6">
+                        <h2 class="text-3xl font-bold text-slate-100">مدیریت استخر ارزها</h2>
+                    </header>
+                    <div class="flex-grow glass-card rounded-2xl overflow-hidden flex flex-col">
+                        <div class="table-container overflow-x-auto flex-grow">
+                            <table class="w-full text-sm text-right text-slate-400">
+                                <thead class="text-xs text-slate-300 uppercase bg-slate-800/60 sticky top-0 z-10">
+                                    <tr>
+                                        <th scope="col" class="px-6 py-3">ارز</th>
+                                        <th scope="col" class="px-6 py-3">موجودی کل</th>
+                                        <th scope="col" class="px-6 py-3">میانگین قیمت تمام شده (تومان)</th>
+                                        <th scope="col" class="px-6 py-3">عملیات</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="pools-table-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Users Page -->
+            <div id="page-users" class="page-content">
+                <div class="flex flex-col h-full">
+                    <header class="flex-shrink-0 flex flex-wrap items-center justify-between gap-4 mb-6">
+                        <h2 class="text-3xl font-bold text-slate-100">مدیریت کاربران و دسترسی‌ها</h2>
+                    </header>
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-grow">
+                        <!-- Users List -->
+                        <div class="lg:col-span-2 flex flex-col gap-6">
+                            <div class="glass-card rounded-2xl p-6">
+                                <div class="flex justify-between items-center mb-4">
+                                    <h3 class="text-lg font-semibold text-slate-100">لیست کاربران</h3>
+                                    <button id="add-user-btn" class="bg-cyan-500 text-slate-900 font-semibold px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-cyan-400 transition-colors text-sm">
+                                        <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z" /></svg>
+                                        <span>کاربر جدید</span>
+                                    </button>
+                                </div>
+                                <div class="table-container overflow-x-auto">
+                                    <table class="w-full text-sm text-right text-slate-400">
+                                        <thead class="text-xs text-slate-300 uppercase bg-slate-800/60">
+                                            <tr>
+                                                <th class="px-6 py-3">نام</th>
+                                                <th class="px-6 py-3">ایمیل</th>
+                                                <th class="px-6 py-3">نقش</th>
+                                                <th class="px-6 py-3">عملیات</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="users-table-body"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Roles List -->
+                        <div class="lg:col-span-1 glass-card rounded-2xl p-6">
+                             <div class="flex justify-between items-center mb-4">
+                                <h3 class="text-lg font-semibold text-slate-100">نقش‌ها و دسترسی‌ها</h3>
+                                <button id="add-role-btn" class="bg-emerald-500/80 text-white font-semibold px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-emerald-600/80 transition-colors text-sm">
+                                    <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z" /></svg>
+                                    <span>نقش جدید</span>
+                                </button>
+                            </div>
+                            <div id="roles-section" class="space-y-4"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Details Modal -->
+    <div id="details-modal" class="modal hidden fixed inset-0 bg-black bg-opacity-70 z-50 flex items-center justify-center p-4">
+        <div class="glass-card rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center p-4 border-b border-slate-700/50">
+                <h3 id="details-modal-title" class="text-xl font-bold text-white">جزئیات کامل تراکنش</h3>
+                <button class="close-modal-btn text-slate-400 hover:text-white">
+                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+            </div>
+            <div id="details-modal-body" class="modal-body p-6 overflow-y-auto"></div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Transaction Modal -->
+    <div id="transaction-form-modal" class="modal hidden fixed inset-0 bg-black bg-opacity-70 z-50 flex items-center justify-center p-4">
+        <div class="glass-card rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center p-4 border-b border-slate-700/50">
+                <h3 id="transaction-form-title" class="text-xl font-bold text-white">افزودن تراکنش جدید</h3>
+                <button class="close-modal-btn text-slate-400 hover:text-white">
+                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+            </div>
+            <div class="modal-body p-6 overflow-y-auto">
+                <form id="transaction-form" class="space-y-4"></form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, where, getDocs, serverTimestamp, Timestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- GLOBAL STATE ---
+        let db, auth;
+        let ALL_TRANSACTIONS = [];
+        let currencyPools = {};
+        let users = [];
+        let roles = {};
+        let currentUser = null;
+        let unsubscribeTransactions, unsubscribeUsers, unsubscribeRoles;
+
+        // --- CORE APP LOGIC ---
+        function main(user) {
+            currentUser = user;
+            if (currentUser) {
+                console.log("Authenticated user:", currentUser.uid);
+                setupRealtimeListeners();
+                document.getElementById('loading-overlay').style.display = 'none';
+                initializeUI();
+            } else {
+                console.log("User is not authenticated.");
+                // Optionally handle the unauthenticated state, e.g., show a login page
+            }
+        }
+
+        function initializeUI() {
+            setupDashboard();
+            setupTransactionsPage();
+            setupUsersPage();
+            applyPermissions();
+            switchPage('dashboard');
+        }
+
+        // --- REALTIME LISTENERS ---
+        function setupRealtimeListeners() {
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+            const transactionsRef = collection(db, `artifacts/${appId}/public/data/transactions`);
+            const usersRef = collection(db, `artifacts/${appId}/public/data/users`);
+            const rolesRef = collection(db, `artifacts/${appId}/public/data/roles`);
+
+            if (unsubscribeTransactions) unsubscribeTransactions();
+            unsubscribeTransactions = onSnapshot(transactionsRef, (snapshot) => {
+                ALL_TRANSACTIONS = snapshot.docs.map(doc => {
+                    const data = doc.data();
+                    // Convert Firestore Timestamps to JS Dates
+                    return {
+                        ...data,
+                        id: doc.id,
+                        orderdate: data.orderdate instanceof Timestamp ? data.orderdate.toDate() : new Date(data.orderdate)
+                    };
+                });
+                console.log("Transactions updated:", ALL_TRANSACTIONS.length);
+                processAllTransactionsForPools();
+                filterAndRenderTransactions();
+                updateDashboardView();
+            });
+
+            if (unsubscribeUsers) unsubscribeUsers();
+            unsubscribeUsers = onSnapshot(usersRef, (snapshot) => {
+                users = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                console.log("Users updated:", users.length);
+                renderUsersTable();
+            });
+
+            if (unsubscribeRoles) unsubscribeRoles();
+            unsubscribeRoles = onSnapshot(rolesRef, (snapshot) => {
+                roles = {};
+                snapshot.docs.forEach(doc => {
+                    roles[doc.id] = { id: doc.id, ...doc.data() };
+                });
+                console.log("Roles updated:", Object.keys(roles).length);
+                renderRolesSection();
+            });
+        }
+        
+        // --- DATA PROCESSING ---
+        function processAllTransactionsForPools() {
+            currencyPools = {};
+            // Sort transactions by date to process them in order
+            const sortedTransactions = [...ALL_TRANSACTIONS].sort((a, b) => a.orderdate - b.orderdate);
+            sortedTransactions.forEach(t => processTransactionForPool(t));
+        }
+
+        function processTransactionForPool(t) {
+            if (!currencyPools[t.currencie_slug]) {
+                currencyPools[t.currencie_slug] = { quantity: 0, weightedAvgCost: 0, log: [] };
+            }
+            const pool = currencyPools[t.currencie_slug];
+            const logEntry = { date: t.orderdate, amount: t.currency_amount, orderid: t.orderid };
+
+            if (t.services_type === 'buy') {
+                const newTotalQty = pool.quantity + t.currency_amount;
+                pool.weightedAvgCost = newTotalQty > 0 ? ((pool.quantity * pool.weightedAvgCost) + (t.currency_amount * t.currency_price)) / newTotalQty : 0;
+                pool.quantity = newTotalQty;
+                logEntry.type = 'واریز';
+                logEntry.rate = t.currency_price;
+            } else {
+                pool.quantity -= t.currency_amount;
+                logEntry.type = 'برداشت';
+                logEntry.rate = pool.weightedAvgCost;
+            }
+            pool.log.push(logEntry);
+        }
+
+        // --- UI & PAGE LOGIC ---
+        let salesProfitChart, profitCompositionChart;
+        let currentPage = 1;
+        const ROWS_PER_PAGE = 15;
+        let filteredTransactions = [];
+
+        const formatCurrency = (value, decimals = 2) => {
+            if (typeof value !== 'number') { value = parseFloat(value); }
+            if (isNaN(value)) { return '0'; }
+            return new Intl.NumberFormat('fa-IR').format(value.toFixed(decimals));
+        };
+        const formatDate = (date) => new Date(date).toLocaleDateString('fa-IR', { year: 'numeric', month: '2-digit', day: '2-digit' });
+        
+        let updateDashboardView = () => {};
+
+        const navLinks = document.querySelectorAll('.nav-link');
+        const pageContents = document.querySelectorAll('.page-content');
+        function switchPage(pageId) {
+            navLinks.forEach(link => link.classList.remove('active'));
+            pageContents.forEach(page => page.classList.remove('active'));
+            document.getElementById(`nav-${pageId}`).classList.add('active');
+            document.getElementById(`page-${pageId}`).classList.add('active');
+            if (pageId === 'pools') renderPoolsTable();
+            if (pageId === 'users') { renderUsersTable(); renderRolesSection(); }
+        }
+        navLinks.forEach(link => link.addEventListener('click', (e) => {
+            e.preventDefault();
+            switchPage(e.currentTarget.id.replace('nav-', ''));
+        }));
+
+        function setupDashboard() {
+            const JALALI_MONTHS = ["فروردین", "اردیبهشت", "خرداد", "تیر", "مرداد", "شهریور", "مهر", "آبان", "آذر", "دی", "بهمن", "اسفند"];
+            const JALALI_QUARTERS = ["بهار (فروردین-خرداد)", "تابستان (تیر-شهریور)", "پاییز (مهر-آذر)", "زمستان (دی-اسفند)"];
+            const yearFilter = document.getElementById('year-filter');
+            const intervalTypeFilter = document.getElementById('interval-type-filter');
+            const periodFilter = document.getElementById('period-filter');
+            
+            function displayCurrentTime() {
+                const datetimeEl = document.getElementById('current-datetime');
+                if (!datetimeEl) return;
+                const updateTime = () => {
+                    const now = new Date();
+                    const options = { timeZone: 'Asia/Tehran', year: 'numeric', month: 'long', day: 'numeric', weekday: 'long', hour: '2-digit', minute: '2-digit', calendar: 'persian' };
+                    const formattedDate = new Intl.DateTimeFormat('fa-IR', options).format(now);
+                    datetimeEl.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-cyan-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg><span>${formattedDate.replace('، ساعت', ' |')}</span>`;
+                };
+                updateTime();
+                setInterval(updateTime, 60000);
+            }
+
+            function populateDashboardFilters() {
+                const currentJalaliYear = new persianDate().year();
+                yearFilter.innerHTML = '';
+                for (let year = 1397; year <= currentJalaliYear; year++) {
+                     yearFilter.innerHTML += `<option value="${year}">${year}</option>`;
+                }
+               
+                intervalTypeFilter.innerHTML = `<option value="monthly">ماهیانه</option><option value="quarterly">فصلی</option><option value="yearly">سالیانه</option>`;
+                updatePeriodFilter();
+                
+                const currentJalaliDate = new persianDate();
+                yearFilter.value = currentJalaliDate.year();
+                periodFilter.value = currentJalaliDate.month() - 1;
+            }
+
+            function updatePeriodFilter() {
+                const intervalType = intervalTypeFilter.value;
+                periodFilter.innerHTML = '';
+                periodFilter.style.display = 'block';
+                if (intervalType === 'monthly') {
+                    JALALI_MONTHS.forEach((month, index) => { periodFilter.innerHTML += `<option value="${index}">${month}</option>`; });
+                } else if (intervalType === 'quarterly') {
+                    JALALI_QUARTERS.forEach((q, index) => { periodFilter.innerHTML += `<option value="${index}">${q}</option>`; });
+                } else {
+                    periodFilter.style.display = 'none';
+                }
+            }
+
+            function getSelectedDateRange() {
+                const jalaliYear = parseInt(yearFilter.value);
+                const interval = intervalTypeFilter.value;
+                const period = parseInt(periodFilter.value); 
+                const jalaliMonths = [
+                    { name: "Farvardin",  start: { m: 2, d: 21 }, end: { m: 3, d: 20 } }, { name: "Ordibehesht",start: { m: 3, d: 21 }, end: { m: 4, d: 21 } },
+                    { name: "Khordad",    start: { m: 4, d: 22 }, end: { m: 5, d: 21 } }, { name: "Tir",        start: { m: 5, d: 22 }, end: { m: 6, d: 22 } },
+                    { name: "Mordad",     start: { m: 6, d: 23 }, end: { m: 7, d: 22 } }, { name: "Shahrivar",  start: { m: 7, d: 23 }, end: { m: 8, d: 22 } },
+                    { name: "Mehr",       start: { m: 8, d: 23 }, end: { m: 9, d: 22 } }, { name: "Aban",       start: { m: 9, d: 23 }, end: { m: 10, d: 21 } },
+                    { name: "Azar",       start: { m: 10, d: 22 }, end: { m: 11, d: 21 } }, { name: "Dey",        start: { m: 11, d: 22 }, end: { m: 0, d: 20 } },
+                    { name: "Bahman",     start: { m: 0, d: 21 }, end: { m: 1, d: 19 } }, { name: "Esfand",     start: { m: 1, d: 20 }, end: { m: 2, d: 20 } },
+                ];
+                let startDate, endDate;
+                if (interval === 'yearly') {
+                    const startGregorianYear = jalaliYear + 621;
+                    startDate = new Date(startGregorianYear, 2, 21);
+                    endDate = new Date(startGregorianYear + 1, 2, 20);
+                } else if (interval === 'quarterly') {
+                    const startMonthIndex = period * 3;
+                    const endMonthIndex = startMonthIndex + 2;
+                    const startMonthInfo = jalaliMonths[startMonthIndex];
+                    const endMonthInfo = jalaliMonths[endMonthIndex];
+                    const startGregorianYear = jalaliYear + (startMonthInfo.start.m >= 2 ? 621 : 622);
+                    const endGregorianYear = jalaliYear + (endMonthInfo.end.m >= 2 ? 621 : 622);
+                    startDate = new Date(startGregorianYear, startMonthInfo.start.m, startMonthInfo.start.d);
+                    endDate = new Date(endGregorianYear, endMonthInfo.end.m, endMonthInfo.end.d);
+                } else {
+                    const monthInfo = jalaliMonths[period];
+                    const startGregorianYear = jalaliYear + (monthInfo.start.m >= 2 ? 621 : 622);
+                    const endGregorianYear = jalaliYear + (monthInfo.end.m >= 2 ? 622 : 622);
+                    startDate = new Date(startGregorianYear, monthInfo.start.m, monthInfo.start.d);
+                    endDate = new Date(endGregorianYear, monthInfo.end.m, monthInfo.end.d);
+                }
+                return { startDate, endDate };
+            }
+
+            function filterDashboardData() {
+                const { startDate, endDate } = getSelectedDateRange();
+                return ALL_TRANSACTIONS.filter(t => t.orderdate >= startDate && t.orderdate <= endDate);
+            }
+
+            updateDashboardView = function() {
+                const data = filterDashboardData();
+                renderKPIs(data);
+                renderSalesProfitChart(data);
+                renderProfitCompositionChart(data);
+            }
+
+            function renderKPIs(data) {
+                const kpiGrid = document.getElementById('kpi-grid');
+                if (!kpiGrid) return;
+                kpiGrid.innerHTML = '';
+                const salesOrders = data.filter(d => d.services_type === 'sell');
+                const buyOrders = data.filter(d => d.services_type === 'buy');
+                const totalSalesVolume = salesOrders.reduce((sum, d) => sum + d.Total_Amount, 0);
+                const totalBuyVolume = buyOrders.reduce((sum, d) => sum + d.Total_Amount, 0);
+                const totalNetProfit = data.reduce((sum, d) => sum + d.NetProfit, 0);
+                const numVipOrders = data.filter(d => d.Vip_Amount > 0).length;
+                const avgProfitPerOrder = data.length > 0 ? totalNetProfit / data.length : 0;
+                const networkFeeProfit = data.reduce((sum, d) => sum + (d.Network_Wage - d.ActualNetwork_Wage), 0);
+                const kpis = [
+                    { label: 'حجم کل فروش', value: `${formatCurrency(totalSalesVolume,0)}`, unit: 'تومان', icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v.01' },
+                    { label: 'حجم کل خرید', value: `${formatCurrency(totalBuyVolume,0)}`, unit: 'تومان', icon: 'M3 10h18M7 15h1m4 0h1m4 0h1m-1-5h1.5a2.5 2.5 0 0 0 0-5H18' },
+                    { label: 'سود خالص کل', value: `${formatCurrency(totalNetProfit,0)}`, unit: 'تومان', icon: 'M13 17h8m0 0V9m0 8l-8-8-4 4-6-6' },
+                    { label: 'تعداد سفارش‌های فروش', value: formatCurrency(salesOrders.length, 0), unit: 'عدد', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2Z' },
+                    { label: 'تعداد سفارش‌های خرید', value: formatCurrency(buyOrders.length, 0), unit: 'عدد', icon: 'M16 11V7a4 4 0 0 0-8 0v4M5 9h14l1 12H4L5 9z' },
+                    { label: 'تعداد سفارش‌های VIP', value: formatCurrency(numVipOrders, 0), unit: 'عدد', icon: 'M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z' },
+                    { label: 'میانگین سود هر سفارش', value: `${formatCurrency(avgProfitPerOrder,0)}`, unit: 'تومان', icon: 'M17 9V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2m2 4h10a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2Zm-3-9h2' },
+                    { label: 'سود کارمزد شبکه', value: `${formatCurrency(networkFeeProfit,0)}`, unit: 'تومان', icon: 'M8.684 13.342C8.886 13.545 9 13.848 9 14.158V15.5a1.5 1.5 0 0 1-1.5 1.5h-1a1.5 1.5 0 0 1-1.5-1.5v-1.342c0-.31.114-.613.316-.816l8-8c.202-.202.505-.316.816-.316h1.342a1.5 1.5 0 0 1 1.5 1.5v1a1.5 1.5 0 0 1-1.5 1.5h-1.582c-.31 0-.613.114-.816.316l-8 8Z' },
+                ];
+                kpis.forEach(kpi => {
+                    const card = document.createElement('div');
+                    card.className = 'glass-card p-4 rounded-xl flex items-start gap-4 fade-in';
+                    const unitHtml = kpi.unit ? `<span class="text-xs mr-1">${kpi.unit}</span>` : '';
+                    card.innerHTML = `<div class="bg-slate-800/60 h-10 w-10 shrink-0 flex items-center justify-center rounded-lg"><svg class="h-5 w-5 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="${kpi.icon}" /></svg></div><div><p class="text-sm text-slate-400 mb-1">${kpi.label}</p><p class="text-xl font-bold text-white flex items-baseline">${kpi.value} ${unitHtml}</p></div>`;
+                    kpiGrid.appendChild(card);
+                });
+            }
+            
+            function renderSalesProfitChart(data) {
+                const { startDate, endDate } = getSelectedDateRange();
+                const selectedPeriod = periodFilter.options[periodFilter.selectedIndex].text;
+                document.getElementById('sales-profit-chart-title').textContent = `مقایسه فروش و سود - ${selectedPeriod}`;
+                const aggregatedData = {};
+                for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+                    aggregatedData[d.toISOString().split('T')[0]] = { sales: 0, profit: 0 };
+                }
+                data.forEach(t => {
+                    const key = t.orderdate.toISOString().split('T')[0];
+                    if (aggregatedData[key]) {
+                        if (t.services_type === 'sell') aggregatedData[key].sales += t.Total_Amount;
+                        aggregatedData[key].profit += t.NetProfit;
+                    }
+                });
+                const labels = Object.keys(aggregatedData);
+                const salesData = Object.values(aggregatedData).map(d => d.sales);
+                const profitData = Object.values(aggregatedData).map(d => d.profit);
+                const ctx = document.getElementById('salesProfitChart').getContext('2d');
+                if(salesProfitChart) salesProfitChart.destroy();
+                const yAxisCallback = (value) => {
+                    if (value === 0) return '۰';
+                    return `${new Intl.NumberFormat('fa-IR').format(value / 1000000)} M`;
+                };
+                salesProfitChart = new Chart(ctx, {
+                    type: 'line',
+                    data: { labels, datasets: [{ label: 'سود خالص', data: profitData, borderColor: '#f59e0b', backgroundColor: 'rgba(245, 158, 11, 0.1)', fill: true, borderWidth: 2, tension: 0.4, pointRadius: 0, pointHoverRadius: 6, pointBackgroundColor: '#f59e0b', yAxisID: 'y1' }, { label: 'حجم فروش', data: salesData, backgroundColor: 'rgba(34, 211, 238, 0.1)', borderColor: '#22d3ee', fill: true, borderWidth: 2, tension: 0.4, pointRadius: 0, pointHoverRadius: 6, pointBackgroundColor: '#22d3ee', yAxisID: 'y' }] },
+                    options: { responsive: true, maintainAspectRatio: false, interaction: { intersect: false, mode: 'index' }, plugins: { legend: { position: 'top', align: 'end', labels: { color: '#94a3b8', usePointStyle: true, boxWidth: 8, font: { family: 'Vazirmatn' } } }, tooltip: { rtl: true, textDirection: 'rtl', backgroundColor: 'rgba(2, 6, 23, 0.8)', titleFont: { family: 'Vazirmatn' }, bodyFont: { family: 'Vazirmatn' }, padding: 12, cornerRadius: 8, callbacks: { title: (tooltipItems) => new Date(tooltipItems[0].label).toLocaleDateString('fa-IR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }), label: (c) => `${c.dataset.label}: ${formatCurrency(c.raw,0)} تومان` } } }, scales: { x: { grid: { display: false }, ticks: { color: '#94a3b8', font: { family: 'Vazirmatn' }, maxRotation: 0, autoSkip: true, maxTicksLimit: 15, callback: (v, i, values) => new Date(labels[i]).toLocaleDateString('fa-IR', {day: 'numeric'}) } }, y: { position: 'right', beginAtZero: true, grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: '#94a3b8', font: { family: 'Vazirmatn' }, callback: yAxisCallback } }, y1: { position: 'left', beginAtZero: true, grid: { drawOnChartArea: false }, ticks: { color: '#f59e0b', font: { family: 'Vazirmatn' }, callback: yAxisCallback } } } }
+                });
+            }
+            
+            function renderProfitCompositionChart(data) {
+                const selectedPeriod = periodFilter.options[periodFilter.selectedIndex].text;
+                document.getElementById('profit-composition-chart-title').textContent = `ترکیب سود خالص - ${selectedPeriod}`;
+                const networkFeeProfit = data.reduce((sum, d) => sum + (d.Network_Wage - d.ActualNetwork_Wage), 0);
+                const totalFixWage = data.reduce((sum, d) => sum + d.Fix_Wage, 0);
+                const totalVipAmount = data.reduce((sum, d) => sum + d.Vip_Amount, 0);
+                const totalNetProfit = data.reduce((sum, d) => sum + d.NetProfit, 0);
+                const marginProfit = totalNetProfit - networkFeeProfit - totalFixWage - totalVipAmount;
+                const chartData = [marginProfit, totalFixWage, totalVipAmount, networkFeeProfit].map(v => v > 0 ? v : 0);
+                const labels = ['سود مارجین', 'کارمزد ثابت', 'کارمزد VIP', 'سود کارمزد شبکه'];
+                const colors = ['#0ea5e9', '#10b981', '#f97316', '#8b5cf6'];
+                const ctx = document.getElementById('profitCompositionChart').getContext('2d');
+                if(profitCompositionChart) profitCompositionChart.destroy();
+                profitCompositionChart = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: { labels, datasets: [{ data: chartData, backgroundColor: colors, borderColor: '#020617', borderWidth: 4, hoverOffset: 12 }] },
+                    options: { responsive: true, maintainAspectRatio: false, cutout: '70%', plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8', usePointStyle: true, boxWidth: 8, padding: 20, font: { family: 'Vazirmatn' } } }, tooltip: { rtl: true, textDirection: 'rtl', backgroundColor: 'rgba(2, 6, 23, 0.8)', titleFont: { family: 'Vazirmatn' }, bodyFont: { family: 'Vazirmatn' }, padding: 12, cornerRadius: 8, callbacks: { label: (c) => `${c.label}: ${formatCurrency(c.raw,0)} تومان` } } } }
+                });
+            }
+
+            displayCurrentTime();
+            populateDashboardFilters();
+            [yearFilter, intervalTypeFilter, periodFilter].forEach(el => el.addEventListener('change', () => {
+                if(el.id === 'interval-type-filter') updatePeriodFilter();
+                updateDashboardView();
+            }));
+        }
+
+        function setupTransactionsPage() {
+            $(".persian-datepicker").persianDatepicker({
+                format: 'YYYY/MM/DD', timeZone: 'Asia/Tehran', initialValue: false,
+                onSelect: () => { currentPage = 1; filterAndRenderTransactions(); }
+            });
+            const searchInput = document.getElementById('tx-search-input');
+            const typeFilter = document.getElementById('tx-type-filter');
+            searchInput.addEventListener('input', () => { currentPage = 1; filterAndRenderTransactions(); });
+            typeFilter.addEventListener('change', () => { currentPage = 1; filterAndRenderTransactions(); });
+            document.querySelectorAll('.persian-datepicker').forEach(input => {
+                input.addEventListener('input', (e) => { if(e.target.value === '') filterAndRenderTransactions(); });
+            });
+            document.getElementById('export-csv-btn').addEventListener('click', exportToCSV);
+            document.getElementById('add-transaction-btn').addEventListener('click', () => openTransactionModal());
+            document.querySelectorAll('.close-modal-btn').forEach(btn => btn.addEventListener('click', closeModal));
+            document.querySelectorAll('.modal').forEach(modal => modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); }));
+        }
+
+        function getFilteredData() {
+            const searchTerm = document.getElementById('tx-search-input').value.toLowerCase();
+            const startDateEl = document.getElementById('tx-start-date');
+            const endDateEl = document.getElementById('tx-end-date');
+            let startDateUnix = 0;
+            const startDatePicker = $(startDateEl).data('datepicker');
+            if (startDateEl.value && startDatePicker && startDatePicker.getState().selected) {
+                 startDateUnix = startDatePicker.getState().selected.unixDate;
+            }
+            let endDateUnix = Infinity;
+            const endDatePicker = $(endDateEl).data('datepicker');
+            if (endDateEl.value && endDatePicker && endDatePicker.getState().selected) {
+                 endDateUnix = endDatePicker.getState().selected.unixDate + 86400000;
+            }
+            const type = document.getElementById('tx-type-filter').value;
+            return ALL_TRANSACTIONS.filter(t => {
+                const searchMatch = searchTerm === '' || String(t.orderid).toLowerCase().includes(searchTerm) || (t.Mobile && t.Mobile.includes(searchTerm)) || (t.Email && t.Email.toLowerCase().includes(searchTerm));
+                const typeMatch = type === '' || t.services_type === type;
+                const date = t.orderdate.getTime();
+                const dateMatch = date >= startDateUnix && date < endDateUnix;
+                return searchMatch && typeMatch && dateMatch;
+            });
+        }
+
+        function filterAndRenderTransactions() {
+            filteredTransactions = getFilteredData().sort((a, b) => b.orderdate - a.orderdate);
+            renderTransactionsTable();
+            renderPagination();
+        }
+        
+        function renderTransactionsTable() {
+            const tableBody = document.getElementById('transactions-table-body');
+            if (!tableBody) return;
+            tableBody.innerHTML = '';
+            const paginatedItems = filteredTransactions.slice((currentPage - 1) * ROWS_PER_PAGE, currentPage * ROWS_PER_PAGE);
+            if (paginatedItems.length === 0) {
+                tableBody.innerHTML = `<tr><td colspan="9" class="text-center py-8">تراکنشی یافت نشد.</td></tr>`;
+                return;
+            }
+            paginatedItems.forEach(t => {
+                const profitColor = t.NetProfit >= 0 ? 'text-green-400' : 'text-red-400';
+                const row = document.createElement('tr');
+                row.className = 'border-b border-slate-700/50 hover:bg-slate-800/40';
+                row.innerHTML = `
+                    <td class="px-4 py-4 font-mono text-xs text-slate-300">${String(t.orderid).includes('-') ? String(t.orderid).split('-')[1] : t.orderid}</td>
+                    <td class="px-4 py-4 whitespace-nowrap">${formatDate(t.orderdate)}</td>
+                    <td class="px-4 py-4"><div>${t.first_name || ''} ${t.last_name || ''}</div><div class="text-xs text-slate-500">${t.Mobile || ''}</div></td>
+                    <td class="px-4 py-4"><span class="px-2 py-1 rounded-full text-xs ${t.services_type === 'sell' ? 'bg-red-500/20 text-red-300' : 'bg-green-500/20 text-green-300'}">${t.services_type === 'sell' ? 'فروش' : 'خرید'}</span></td>
+                    <td class="px-4 py-4 font-semibold text-white">${t.currencie_slug}</td>
+                    <td class="px-4 py-4 font-mono">${formatCurrency(t.currency_amount, 6)}</td>
+                    <td class="px-4 py-4 font-mono text-white">${formatCurrency(t.Total_Amount,0)}</td>
+                    <td class="px-4 py-4 font-mono ${profitColor}">${formatCurrency(t.NetProfit,0)}</td>
+                    <td class="px-4 py-4 flex items-center gap-2">
+                        <button class="details-btn text-slate-400 hover:text-cyan-400" title="جزئیات"><svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg></button>
+                        <button class="edit-btn text-slate-400 hover:text-amber-400" title="اصلاح"><svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M5.433 13.917l1.262-3.155A4 4 0 017.58 9.42l6.92-6.918a2.121 2.121 0 013 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 01-.65-.65z" /><path d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0010 3H4.75A2.75 2.75 0 002 5.75v9.5A2.75 2.75 0 004.75 18h9.5A2.75 2.75 0 0017 15.25V10a.75.75 0 00-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5z" /></svg></button>
+                        ${t.editHistory && t.editHistory.length > 0 ? `<button class="history-btn text-slate-400 hover:text-fuchsia-400" title="تاریخچه تغییرات"><svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-13a.75.75 0 00-1.5 0v5c0 .414.336.75.75.75h4a.75.75 0 000-1.5h-3.25V5z" clip-rule="evenodd" /></svg></button>` : ''}
+                    </td>
+                `;
+                row.querySelector('.details-btn').addEventListener('click', () => showDetailsModal(t));
+                row.querySelector('.edit-btn').addEventListener('click', () => openTransactionModal(t));
+                if(t.editHistory && t.editHistory.length > 0) {
+                    row.querySelector('.history-btn').addEventListener('click', () => showHistoryModal(t));
+                }
+                tableBody.appendChild(row);
+            });
+        }
+
+        function renderPagination() {
+            const paginationEl = document.getElementById('tx-pagination');
+            if (!paginationEl) return;
+            const totalPages = Math.ceil(filteredTransactions.length / ROWS_PER_PAGE);
+            paginationEl.innerHTML = `<span class="text-sm text-slate-400">نمایش ${filteredTransactions.length > 0 ? (currentPage - 1) * ROWS_PER_PAGE + 1 : 0} تا ${Math.min(currentPage * ROWS_PER_PAGE, filteredTransactions.length)} از ${filteredTransactions.length} نتیجه</span>`;
+            if (totalPages > 1) {
+                let buttons = `<div class="flex items-center gap-2">`;
+                buttons += `<button ${currentPage === 1 ? 'disabled' : ''} onclick="window.changePage(${currentPage - 1})" class="px-3 py-1 bg-slate-700 rounded disabled:opacity-50 disabled:cursor-not-allowed">قبلی</button>`;
+                buttons += `<span class="px-3 py-1">${currentPage} / ${totalPages}</span>`;
+                buttons += `<button ${currentPage === totalPages ? 'disabled' : ''} onclick="window.changePage(${currentPage + 1})" class="px-3 py-1 bg-slate-700 rounded disabled:opacity-50 disabled:cursor-not-allowed">بعدی</button>`;
+                buttons += `</div>`;
+                paginationEl.innerHTML += buttons;
+            }
+        }
+        window.changePage = (page) => { currentPage = page; renderTransactionsTable(); renderPagination(); }
+
+        function exportToCSV() {
+            const dataToExport = getFilteredData();
+            const headers = [ "orderid", "orderdate", "userid", "first_name", "last_name", "Mobile", "Email", "service_slug", "categories_title", "services_type", "currency", "currencie_slug", "Source Wallet Address", "Destination Wallet Address", "Txid", "currency_amount", "Is Crypto?", "crypto_total_usdt", "currency_price", "Cost_Basis", "Network Wage", "ActualNetwork Wage", "Fix Wage", "Total Amount", "Vip Amount", "Voucher Amount", "Vouchers Code", "description", "NetProfit" ];
+            let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
+            csvContent += headers.join(",") + "\r\n";
+            dataToExport.forEach(row => {
+                const rowData = headers.map(header => {
+                    let cell = row[header] === null || row[header] === undefined ? '' : row[header];
+                    if (typeof cell === 'string' && cell.includes(',')) { cell = `"${cell}"`; }
+                    if(header === 'orderdate') { cell = new persianDate(row[header]).format('YYYY/MM/DD HH:mm:ss'); }
+                    return cell;
+                });
+                csvContent += rowData.join(",") + "\r\n";
+            });
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "transactions_export.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        const detailsModal = document.getElementById('details-modal');
+        const transactionFormModal = document.getElementById('transaction-form-modal');
+        function closeModal() {
+            detailsModal.classList.add('hidden');
+            transactionFormModal.classList.add('hidden');
+        }
+        
+        function showDetailsModal(t) {
+            const modalBody = document.getElementById('details-modal-body');
+            document.getElementById('details-modal-title').textContent = 'جزئیات کامل تراکنش';
+            const detailItem = (label, value, extraClass = '') => `<div class="py-2.5 grid grid-cols-3 gap-4 border-b border-slate-700/30"><dt class="text-sm text-slate-400">${label}</dt><dd class="col-span-2 text-sm text-white font-mono break-words ${extraClass}">${value}</dd></div>`;
+            modalBody.innerHTML = `<div class="grid grid-cols-1 md:grid-cols-2 gap-x-8"><div><h4 class="text-lg font-semibold text-cyan-400 mb-2">اطلاعات سفارش</h4><dl>${detailItem('ID سفارش', t.orderid)}${detailItem('تاریخ سفارش', new Date(t.orderdate).toLocaleString('fa-IR', { timeZone: 'Asia/Tehran' }))}${detailItem('اسلاگ سرویس', t.service_slug)}${detailItem('عنوان دسته', t.categories_title)}${detailItem('نوع سرویس', t.services_type === 'sell' ? 'فروش به مشتری' : 'خرید از مشتری')}${detailItem('کریپتو؟', t['Is Crypto?'] ? 'بله' : 'خیر')}${detailItem('کد تخفیف', t['Vouchers Code'] || '---')}${detailItem('توضیحات', `<p class="text-xs leading-relaxed font-sans">${t.description || '---'}</p>`)}</dl></div><div><h4 class="text-lg font-semibold text-cyan-400 mb-2">اطلاعات کاربر</h4><dl>${detailItem('ID کاربر', t.userid)}${detailItem('نام', `<span class="font-sans">${t.first_name}</span>`)}${detailItem('نام خانوادگی', `<span class="font-sans">${t.last_name}</span>`)}${detailItem('موبایل', t.Mobile)}${detailItem('ایمیل', t.Email)}</dl><h4 class="text-lg font-semibold text-cyan-400 mt-6 mb-2">آدرس‌ها و TXID</h4><dl>${detailItem('آدرس مبدا', t['Source Wallet Address'])}${detailItem('آدرس مقصد', t['Destination Wallet Address'])}${detailItem('TXID', t.Txid)}</dl></div></div><div class="mt-6"><h4 class="text-lg font-semibold text-cyan-400 mb-2">جزئیات مالی</h4><div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"><div class="glass-card p-4 rounded-lg">${detailItem('نام ارز', `<span class="font-sans">${t.currency}</span> (${t.currencie_slug})`)}</div><div class="glass-card p-4 rounded-lg">${detailItem('مقدار ارز', formatCurrency(t.currency_amount, 8))}</div><div class="glass-card p-4 rounded-lg">${detailItem('نرخ ارز', formatCurrency(t.currency_price,0))}</div><div class="glass-card p-4 rounded-lg">${detailItem('ارزش تتری', formatCurrency(t.crypto_total_usdt,0))}</div><div class="glass-card p-4 rounded-lg">${detailItem('کارمزد ثابت', formatCurrency(t.Fix_Wage,0))}</div><div class="glass-card p-4 rounded-lg">${detailItem('کارمزد VIP', formatCurrency(t.Vip_Amount,0))}</div><div class="glass-card p-4 rounded-lg">${detailItem('مبلغ ووچر', formatCurrency(t.Voucher_Amount,0))}</div><div class="glass-card p-4 rounded-lg">${detailItem('کارمزد شبکه (دریافتی)', formatCurrency(t.Network_Wage,0))}</div><div class="glass-card p-4 rounded-lg">${detailItem('کارمزد شبکه (واقعی)', formatCurrency(t.ActualNetwork_Wage,0))}</div><div class="glass-card p-4 rounded-lg bg-slate-900/50">${detailItem('قیمت تمام شده (فی واحد)', formatCurrency(t.Cost_Basis,0), 'text-amber-400')}</div><div class="glass-card p-4 rounded-lg bg-slate-900/50">${detailItem('مبلغ کل', formatCurrency(t.Total_Amount,0), 'text-cyan-400 font-bold')}</div><div class="glass-card p-4 rounded-lg bg-slate-900/50">${detailItem('سود/زیان خالص', formatCurrency(t.NetProfit,0), t.NetProfit >= 0 ? 'text-green-400 font-bold' : 'text-red-400 font-bold')}</div></div></div>`;
+            detailsModal.classList.remove('hidden');
+        }
+
+        function showHistoryModal(t) {
+            const modalBody = document.getElementById('details-modal-body');
+            document.getElementById('details-modal-title').textContent = `تاریخچه تغییرات - ${String(t.orderid).includes('-') ? String(t.orderid).split('-')[1] : t.orderid}`;
+            let historyHtml = '<div class="space-y-4">';
+            t.editHistory.forEach((entry, index) => {
+                historyHtml += `<div class="glass-card p-4 rounded-lg"><p class="text-sm text-slate-400 mb-2">تغییر شماره ${index + 1} در تاریخ ${new Date(entry.timestamp.seconds * 1000).toLocaleString('fa-IR', { timeZone: 'Asia/Tehran' })}</p><p class="text-white mb-3"><span class="text-slate-400">توضیحات:</span> ${entry.reason}</p><div class="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs"><div class="text-slate-300"><span class="text-slate-500">فیلد</span></div><div class="text-red-400"><span class="text-slate-500">مقدار قبلی</span></div><div class="text-green-400"><span class="text-slate-500">مقدار جدید</span></div>${Object.keys(entry.changes).map(key => `<div class="font-mono">${key}</div><div class="font-mono text-red-400">${formatCurrency(entry.changes[key].old, 4)}</div><div class="font-mono text-green-400">${formatCurrency(entry.changes[key].new, 4)}</div>`).join('')}</div></div>`;
+            });
+            historyHtml += '</div>';
+            modalBody.innerHTML = historyHtml;
+            detailsModal.classList.remove('hidden');
+        }
+
+        async function openTransactionModal(transaction = null) {
+            const form = document.getElementById('transaction-form');
+            const title = document.getElementById('transaction-form-title');
+            const isEdit = transaction !== null;
+            title.textContent = isEdit ? `اصلاح تراکنش ${String(transaction.orderid).includes('-') ? String(transaction.orderid).split('-')[1] : transaction.orderid}` : 'افزودن تراکنش دستی';
+            const allFields = [ {id: 'orderid', label: 'ID سفارش', type: 'number'},{id: 'orderdate', label: 'تاریخ و زمان', type: 'text'}, {id: 'userid', label: 'ID کاربر', type: 'number'}, {id: 'first_name', label: 'نام', type: 'text'}, {id: 'last_name', label: 'نام خانوادگی', type: 'text'}, {id: 'Mobile', label: 'موبایل', type: 'text'}, {id: 'Email', label: 'ایمیل', type: 'text'}, {id: 'service_slug', label: 'اسلاگ سرویس', type: 'text'}, {id: 'categories_title', label: 'عنوان دسته', type: 'text'}, {id: 'services_type', label: 'نوع سرویس', type: 'select', options: ['buy', 'sell']}, {id: 'currency', label: 'نام ارز', type: 'text'}, {id: 'currencie_slug', label: 'اسلاگ ارز', type: 'text'}, {id: 'Source Wallet Address', label: 'آدرس مبدا', type: 'text'}, {id: 'Destination Wallet Address', label: 'آدرس مقصد', type: 'text'}, {id: 'Txid', label: 'Txid', type: 'text'}, {id: 'currency_amount', label: 'مقدار ارز', type: 'number', step: '0.00000001'}, {id: 'currency_price', label: 'نرخ ارز', type: 'number', step: '0.01', isFinancial: true}, {id: 'Network_Wage', label: 'کارمزد شبکه (دریافتی)', type: 'number', step: '0.01', isFinancial: true}, {id: 'ActualNetwork_Wage', label: 'کارمزد شبکه (واقعی)', type: 'number', step: '0.01', isFinancial: true}, {id: 'Fix_Wage', label: 'کارمزد ثابت', type: 'number', step: '0.01', isFinancial: true}, {id: 'Vip_Amount', label: 'مبلغ VIP', type: 'number', step: '0.01', isFinancial: true}, {id: 'Voucher_Amount', label: 'مبلغ ووچر', type: 'number', step: '0.01', isFinancial: true}, {id: 'Vouchers Code', label: 'کد ووچر', type: 'text'}, {id: 'description', label: 'توضیحات', type: 'textarea'}, ];
+            let formHtml = `<input type="hidden" name="id" value="${isEdit ? transaction.id : ''}"><div class="grid grid-cols-1 md:grid-cols-3 gap-4">`;
+            allFields.forEach(field => {
+                let value = isEdit ? transaction[field.id] : '';
+                if (isEdit && field.id === 'orderdate') { value = new Date(value).toISOString().slice(0, 16); }
+                const disabled = isEdit && !field.isFinancial ? 'disabled' : '';
+                const disabledClass = isEdit && !field.isFinancial ? 'bg-slate-700/50 cursor-not-allowed' : 'bg-slate-800/50';
+                const fieldHtml = (type) => `<${type} name="${field.id}" id="form-${field.id}" ${type === 'textarea' ? '' : `value="${value}"`} ${disabled} ${field.step ? `step="${field.step}"` : ''} class="border border-slate-700 text-slate-300 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block w-full p-2.5 ${disabledClass}" ${type === 'textarea' ? 'rows="3"' : ''}>${type === 'textarea' ? value : ''}`;
+                formHtml += '<div>';
+                formHtml += `<label for="form-${field.id}" class="block mb-2 text-sm font-medium text-slate-400">${field.label}</label>`;
+                if (field.id === 'orderdate') {
+                    formHtml += `<input type="datetime-local" name="orderdate" id="form-orderdate" value="${value}" class="border border-slate-700 text-slate-300 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block w-full p-2.5 ${disabledClass}" ${disabled}>`;
+                } else if (field.type === 'select') {
+                    formHtml += `<select name="${field.id}" id="form-${field.id}" class="border border-slate-700 text-slate-300 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block w-full p-2.5 ${disabledClass}" ${disabled}>`;
+                    field.options.forEach(opt => { formHtml += `<option value="${opt}" ${value === opt ? 'selected' : ''}>${opt}</option>`; });
+                    formHtml += '</select>';
+                } else if (field.type === 'textarea') {
+                    formHtml += `${fieldHtml('textarea')}</textarea>`;
+                } else {
+                    formHtml += `${fieldHtml('input')}`;
+                }
+                formHtml += '</div>';
+            });
+            if (isEdit) {
+                formHtml += `<div class="md:col-span-3"><label for="edit_reason" class="block mb-2 text-sm font-medium text-slate-400">توضیحات اصلاحیه (اجباری)</label><textarea id="edit_reason" name="edit_reason" required class="bg-slate-800/50 border border-slate-700 text-slate-300 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block w-full p-2.5" rows="3"></textarea></div>`;
+            }
+            formHtml += `</div><button type="submit" class="w-full mt-6 text-white bg-cyan-600 hover:bg-cyan-700 focus:ring-4 focus:outline-none focus:ring-cyan-800 font-medium rounded-lg text-sm px-5 py-2.5 text-center">${isEdit ? 'ذخیره تغییرات' : 'ثبت تراکنش'}</button>`;
+            form.innerHTML = formHtml;
+            form.onsubmit = handleTransactionSubmit;
+            transactionFormModal.classList.remove('hidden');
+        }
+
+        async function handleTransactionSubmit(e) {
+            e.preventDefault();
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData.entries());
+            const txId = data.id;
+            
+            const newTxData = {};
+            Object.keys(data).forEach(key => {
+                if (key === 'id' || key === 'edit_reason') return;
+                const value = data[key];
+                if (key === 'orderdate') {
+                    newTxData[key] = Timestamp.fromDate(new Date(value));
+                } else if (!isNaN(parseFloat(value)) && !key.includes('Address') && !key.includes('id') && key !== 'Mobile') {
+                    newTxData[key] = parseFloat(value);
+                } else {
+                    newTxData[key] = value;
+                }
+            });
+            newTxData['Is Crypto?'] = true;
+            newTxData.Total_Amount = (newTxData.currency_amount * newTxData.currency_price) + (newTxData.Vip_Amount || 0) + (newTxData.Fix_Wage || 0) + (newTxData.Network_Wage || 0) - (newTxData.Voucher_Amount || 0);
+            newTxData.crypto_total_usdt = newTxData.currency_amount * newTxData.currency_price;
+
+            const pool = currencyPools[newTxData.currencie_slug] || { weightedAvgCost: 0 };
+            newTxData.Cost_Basis = newTxData.services_type === 'buy' ? newTxData.currency_price : (pool.weightedAvgCost > 0 ? pool.weightedAvgCost : newTxData.currency_price * 0.98);
+            newTxData.NetProfit = newTxData.services_type === 'buy' ? (newTxData.Vip_Amount || 0) + (newTxData.Fix_Wage || 0) + ((newTxData.Network_Wage || 0) - (newTxData.ActualNetwork_Wage || 0)) : newTxData.Total_Amount - ((newTxData.Cost_Basis * newTxData.currency_amount) + (newTxData.ActualNetwork_Wage || 0));
+
+            try {
+                if (txId) { // Edit Mode
+                    const txRef = doc(db, `artifacts/${appId}/public/data/transactions`, txId);
+                    const originalTxDoc = await getDoc(txRef);
+                    const originalTxData = originalTxDoc.data();
+                    const changes = {};
+                    Object.keys(newTxData).forEach(key => {
+                        if (originalTxData[key] !== newTxData[key]) {
+                            changes[key] = { old: originalTxData[key] || null, new: newTxData[key] };
+                        }
+                    });
+                    const editHistoryEntry = { timestamp: serverTimestamp(), reason: data.edit_reason, changes: changes, editorId: currentUser.uid };
+                    const currentHistory = originalTxData.editHistory || [];
+                    newTxData.editHistory = [...currentHistory, editHistoryEntry];
+                    await updateDoc(txRef, newTxData);
+                } else { // Add Mode
+                    newTxData.editHistory = [];
+                    newTxData.createdAt = serverTimestamp();
+                    newTxData.creatorId = currentUser.uid;
+                    await addDoc(collection(db, `artifacts/${appId}/public/data/transactions`), newTxData);
+                }
+                closeModal();
+            } catch (error) {
+                console.error("Error saving transaction:", error);
+            }
+        }
+
+        function renderPoolsTable() {
+            const tableBody = document.getElementById('pools-table-body');
+            if (!tableBody) return;
+            tableBody.innerHTML = '';
+            Object.keys(currencyPools).sort().forEach(slug => {
+                const pool = currencyPools[slug];
+                const row = document.createElement('tr');
+                row.className = 'border-b border-slate-700/50';
+                row.innerHTML = `<td class="px-6 py-4 font-semibold text-white">${slug}</td><td class="px-6 py-4 font-mono">${formatCurrency(pool.quantity, 8)}</td><td class="px-6 py-4 font-mono text-amber-400">${formatCurrency(pool.weightedAvgCost, 2)}</td><td class="px-6 py-4"><button class="pool-log-btn bg-cyan-500/20 text-cyan-300 text-xs px-3 py-1 rounded-md hover:bg-cyan-500/40" data-slug="${slug}">مشاهده لاگ</button></td>`;
+                row.querySelector('.pool-log-btn').addEventListener('click', (e) => showPoolLogModal(e.currentTarget.dataset.slug));
+                tableBody.appendChild(row);
+            });
+        }
+
+        function showPoolLogModal(slug) {
+            const modalBody = document.getElementById('details-modal-body');
+            document.getElementById('details-modal-title').textContent = `لاگ واریز و برداشت استخر ${slug}`;
+            const pool = currencyPools[slug];
+            let logHtml = `<div class="table-container overflow-y-auto max-h-[60vh]"><table class="w-full text-sm text-right text-slate-400"><thead class="text-xs text-slate-300 uppercase bg-slate-800/60 sticky top-0"><tr><th class="px-4 py-2">تاریخ</th><th class="px-4 py-2">نوع</th><th class="px-4 py-2">مقدار</th><th class="px-4 py-2">نرخ (تومان)</th><th class="px-4 py-2">ID سفارش</th></tr></thead><tbody>`;
+            [...pool.log].reverse().forEach(entry => {
+                const typeClass = entry.type === 'واریز' ? 'text-green-400' : 'text-red-400';
+                logHtml += `<tr class="border-b border-slate-700/50"><td class="px-4 py-3 whitespace-nowrap">${new Date(entry.date).toLocaleString('fa-IR', { timeZone: 'Asia/Tehran' })}</td><td class="px-4 py-3 ${typeClass}">${entry.type}</td><td class="px-4 py-3 font-mono">${formatCurrency(entry.amount, 6)}</td><td class="px-4 py-3 font-mono">${formatCurrency(entry.rate, 2)}</td><td class="px-4 py-3 font-mono text-xs">${String(entry.orderid).includes('-') ? String(entry.orderid).split('-')[1] : entry.orderid}</td></tr>`;
+            });
+            logHtml += '</tbody></table></div>';
+            modalBody.innerHTML = logHtml;
+            detailsModal.classList.remove('hidden');
+        }
+
+        const allPermissions = { view_dashboard: 'مشاهده داشبورد', view_transactions: 'مشاهده تراکنش‌ها', edit_transactions: 'اصلاح تراکنش‌ها', create_transactions: 'ایجاد تراکنش', export_data: 'خروجی داده', manage_users: 'مدیریت کاربران', manage_pools: 'مدیریت استخرها' };
+
+        function setupUsersPage() {
+            document.getElementById('add-user-btn').addEventListener('click', () => openUserModal());
+            document.getElementById('add-role-btn').addEventListener('click', () => openRoleModal());
+        }
+
+        function hasPermission(permission) {
+            if (!currentUser || !currentUser.role || !roles[currentUser.role]) return false;
+            return roles[currentUser.role].permissions.includes(permission);
+        }
+
+        function applyPermissions() {
+            document.getElementById('nav-users').style.display = hasPermission('manage_users') ? 'flex' : 'none';
+            const addTxBtn = document.getElementById('add-transaction-btn');
+            if (addTxBtn) addTxBtn.style.display = hasPermission('create_transactions') ? 'flex' : 'none';
+            const exportBtn = document.getElementById('export-csv-btn');
+            if (exportBtn) exportBtn.style.display = hasPermission('export_data') ? 'flex' : 'none';
+        }
+        
+        function renderUsersTable() {
+            const tableBody = document.getElementById('users-table-body');
+            if (!tableBody) return;
+            tableBody.innerHTML = '';
+            users.forEach(user => {
+                const row = document.createElement('tr');
+                row.className = 'border-b border-slate-700/50';
+                row.innerHTML = `<td class="px-6 py-4">${user.name}</td><td class="px-6 py-4 font-mono">${user.email}</td><td class="px-6 py-4"><span class="px-2 py-1 text-xs rounded-full bg-sky-500/20 text-sky-300">${roles[user.role] ? roles[user.role].name : 'ناشناخته'}</span></td><td class="px-6 py-4 flex items-center gap-4"><button class="edit-user-btn text-slate-400 hover:text-amber-400" title="ویرایش"><svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M5.433 13.917l1.262-3.155A4 4 0 017.58 9.42l6.92-6.918a2.121 2.121 0 013 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 01-.65-.65z" /><path d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0010 3H4.75A2.75 2.75 0 002 5.75v9.5A2.75 2.75 0 004.75 18h9.5A2.75 2.75 0 0017 15.25V10a.75.75 0 00-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5z" /></svg></button><button class="delete-user-btn text-slate-400 hover:text-red-400" title="حذف"><svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.58.22-2.365.468a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25-.56-1.25 1.25V4.075c.827-.05 1.66-.075 2.5-.075zM8.47 5.47a.75.75 0 011.06 0L12 7.94l2.47-2.47a.75.75 0 111.06 1.06L13.06 9l2.47 2.47a.75.75 0 11-1.06 1.06L12 10.06l-2.47 2.47a.75.75 0 01-1.06-1.06L10.94 9 8.47 6.53a.75.75 0 010-1.06z" clip-rule="evenodd" /></svg></button></td>`;
+                row.querySelector('.edit-user-btn').addEventListener('click', () => openUserModal(user));
+                row.querySelector('.delete-user-btn').addEventListener('click', () => confirmDeleteUser(user));
+                tableBody.appendChild(row);
+            });
+        }
+
+        function renderRolesSection() {
+            const rolesSection = document.getElementById('roles-section');
+            if (!rolesSection) return;
+            rolesSection.innerHTML = '';
+            Object.values(roles).forEach(role => {
+                let roleHtml = `<div class="glass-card p-4 rounded-lg"><div class="flex justify-between items-center mb-3"><h4 class="text-md font-semibold text-cyan-400">${role.name}</h4><button class="edit-role-btn text-slate-400 hover:text-amber-400" data-role-id="${role.id}"><svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M5.433 13.917l1.262-3.155A4 4 0 017.58 9.42l6.92-6.918a2.121 2.121 0 013 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 01-.65-.65z" /></svg></button></div><div class="space-y-2">`;
+                Object.keys(allPermissions).forEach(permKey => {
+                    const checked = role.permissions.includes(permKey) ? 'checked' : '';
+                    roleHtml += `<label class="flex items-center text-sm opacity-70"><input type="checkbox" ${checked} disabled class="w-4 h-4 rounded bg-slate-700 border-slate-600 text-cyan-500"><span class="mr-2">${allPermissions[permKey]}</span></label>`;
+                });
+                roleHtml += `</div></div>`;
+                rolesSection.innerHTML += roleHtml;
+            });
+            document.querySelectorAll('.edit-role-btn').forEach(btn => btn.addEventListener('click', (e) => openRoleModal(e.currentTarget.dataset.roleId)));
+        }
+
+        function openUserModal(user = null) {
+            const form = document.getElementById('transaction-form');
+            const title = document.getElementById('transaction-form-title');
+            const isEdit = user !== null;
+            title.textContent = isEdit ? `ویرایش کاربر: ${user.name}` : 'افزودن کاربر جدید';
+            let roleOptions = Object.values(roles).map(role => `<option value="${role.id}" ${isEdit && user.role === role.id ? 'selected' : ''}>${role.name}</option>`).join('');
+            form.innerHTML = `<input type="hidden" name="id" value="${isEdit ? user.id : ''}"><div><label for="user-name" class="block mb-2 text-sm font-medium text-slate-400">نام کامل</label><input type="text" name="name" id="user-name" value="${isEdit ? user.name : ''}" required class="bg-slate-800/50 border border-slate-700 text-slate-300 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block w-full p-2.5"></div><div><label for="user-email" class="block mb-2 text-sm font-medium text-slate-400">ایمیل</label><input type="email" name="email" id="user-email" value="${isEdit ? user.email : ''}" required class="bg-slate-800/50 border border-slate-700 text-slate-300 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block w-full p-2.5"></div><div><label for="user-password" class="block mb-2 text-sm font-medium text-slate-400">رمز عبور</label><input type="password" name="password" id="user-password" ${!isEdit ? 'required' : ''} placeholder="${isEdit ? 'برای تغییر، رمز جدید را وارد کنید' : 'رمز عبور را وارد کنید'}" class="bg-slate-800/50 border border-slate-700 text-slate-300 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block w-full p-2.5"></div><div><label for="user-role" class="block mb-2 text-sm font-medium text-slate-400">نقش</label><select name="role" id="user-role" required class="bg-slate-800/50 border border-slate-700 text-slate-300 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block w-full p-2.5">${roleOptions}</select></div><button type="submit" class="w-full mt-4 text-white bg-cyan-600 hover:bg-cyan-700 focus:ring-4 focus:outline-none focus:ring-cyan-800 font-medium rounded-lg text-sm px-5 py-2.5 text-center">${isEdit ? 'ذخیره تغییرات' : 'ایجاد کاربر'}</button>`;
+            form.onsubmit = handleUserSubmit;
+            transactionFormModal.classList.remove('hidden');
+        }
+
+        async function handleUserSubmit(e) {
+            e.preventDefault();
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData.entries());
+            const userData = { name: data.name, email: data.email, role: data.role };
+            // Note: In a real app, password should be hashed on the server, not stored in plaintext.
+            if (data.password) userData.password = data.password;
+            try {
+                if (data.id) {
+                    await setDoc(doc(db, `artifacts/${appId}/public/data/users`, data.id), userData, { merge: true });
+                } else {
+                    await addDoc(collection(db, `artifacts/${appId}/public/data/users`), userData);
+                }
+                closeModal();
+            } catch (error) { console.error("Error saving user:", error); }
+        }
+
+        function confirmDeleteUser(user) {
+            const modalTitle = document.getElementById('details-modal-title');
+            const modalBody = document.getElementById('details-modal-body');
+            modalTitle.textContent = 'تایید حذف کاربر';
+            modalBody.innerHTML = `<p class="text-lg text-center text-white">آیا از حذف کاربر «${user.name}» اطمینان دارید؟</p><div class="flex justify-center gap-4 mt-6"><button id="confirm-delete-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-6 rounded-lg">بله، حذف کن</button><button id="cancel-delete-btn" class="bg-slate-600 hover:bg-slate-700 text-white font-bold py-2 px-6 rounded-lg">انصراف</button></div>`;
+            document.getElementById('confirm-delete-btn').onclick = () => deleteUser(user.id);
+            document.getElementById('cancel-delete-btn').onclick = closeModal;
+            detailsModal.classList.remove('hidden');
+        }
+
+        async function deleteUser(userId) {
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+            try {
+                await deleteDoc(doc(db, `artifacts/${appId}/public/data/users`, userId));
+                closeModal();
+            } catch (error) { console.error("Error deleting user:", error); }
+        }
+
+        function openRoleModal(roleId = null) {
+            const form = document.getElementById('transaction-form');
+            const title = document.getElementById('transaction-form-title');
+            const isEdit = roleId !== null;
+            const role = isEdit ? roles[roleId] : null;
+            title.textContent = isEdit ? `ویرایش نقش: ${role.name}` : 'افزودن نقش جدید';
+            let permissionsHtml = '<div class="grid grid-cols-2 gap-2 mt-2">';
+            Object.keys(allPermissions).forEach(permKey => {
+                const checked = isEdit && role.permissions.includes(permKey) ? 'checked' : '';
+                permissionsHtml += `<label class="flex items-center text-sm"><input type="checkbox" name="permissions" value="${permKey}" ${checked} class="w-4 h-4 rounded bg-slate-700 border-slate-600 text-cyan-500 focus:ring-cyan-600"><span class="mr-2">${allPermissions[permKey]}</span></label>`;
+            });
+            permissionsHtml += '</div>';
+            form.innerHTML = `<input type="hidden" name="id" value="${isEdit ? roleId : ''}"><div><label for="role-name" class="block mb-2 text-sm font-medium text-slate-400">نام نقش</label><input type="text" name="name" id="role-name" value="${isEdit ? role.name : ''}" required class="bg-slate-800/50 border border-slate-700 text-slate-300 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block w-full p-2.5"></div><div><label class="block mb-2 text-sm font-medium text-slate-400">دسترسی‌ها</label>${permissionsHtml}</div><button type="submit" class="w-full mt-4 text-white bg-emerald-600 hover:bg-emerald-700 focus:ring-4 focus:outline-none focus:ring-emerald-800 font-medium rounded-lg text-sm px-5 py-2.5 text-center">${isEdit ? 'ذخیره تغییرات' : 'ایجاد نقش'}</button>`;
+            form.onsubmit = handleRoleSubmit;
+            transactionFormModal.classList.remove('hidden');
+        }
+
+        async function handleRoleSubmit(e) {
+            e.preventDefault();
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+            const formData = new FormData(e.target);
+            const name = formData.get('name');
+            const permissions = formData.getAll('permissions');
+            const roleId = formData.get('id');
+            const roleData = { name, permissions };
+            try {
+                if (roleId) {
+                    await setDoc(doc(db, `artifacts/${appId}/public/data/roles`, roleId), roleData);
+                } else {
+                    await addDoc(collection(db, `artifacts/${appId}/public/data/roles`), roleData);
+                }
+                closeModal();
+            } catch (error) { console.error("Error saving role:", error); }
+        }
+
+        // --- INITIALIZATION ---
+        async function init() {
+            const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+            if (!firebaseConfig.apiKey) {
+                document.getElementById('loading-overlay').innerHTML = '<p class="text-red-400 text-center">پیکربندی Firebase یافت نشد.<br>لطفاً از اتصال صحیح اطمینان حاصل کنید.</p>';
+                return;
+            }
+
+            const app = initializeApp(firebaseConfig);
+            db = getFirestore(app);
+            auth = getAuth(app);
+
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    // User is signed in.
+                    main(user);
+                } else {
+                    // User is signed out.
+                    // Try to sign in with custom token or anonymously
+                    (async () => {
+                        try {
+                            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                                await signInWithCustomToken(auth, __initial_auth_token);
+                            } else {
+                                await signInAnonymously(auth);
+                            }
+                            // The onAuthStateChanged listener will handle the successful sign-in.
+                        } catch (error) {
+                            console.error("Authentication failed:", error);
+                            document.getElementById('loading-overlay').innerHTML = '<p class="text-red-400 text-center">احراز هویت با سرور با مشکل مواجه شد.</p>';
+                        }
+                    })();
+                }
+            });
+        }
+
+        init();
+    </script>
+</body>
+</html>
