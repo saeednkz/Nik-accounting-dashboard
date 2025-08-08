@@ -333,23 +333,45 @@
         let appInitialized = false;
 
         // --- CORE APP LOGIC ---
-        function checkAndInitializeApp() {
+        async function checkAndInitializeApp() {
             // This function runs after each data type is loaded.
             // It only initializes the main UI when ALL required data is ready.
             if (rolesLoaded && usersLoaded && !appInitialized) {
+                const appId = firebaseConfig.projectId;
+                
+                // If no roles exist, create a default Admin role and return.
+                // The onSnapshot listener will re-trigger this function.
+                if (Object.keys(roles).length === 0) {
+                    console.log("No roles found. Creating default Admin role...");
+                    const rolesRef = collection(db, `artifacts/${appId}/public/data/roles`);
+                    const adminPermissions = {
+                        name: 'ادمین کل',
+                        permissions: Object.keys(allPermissions)
+                    };
+                    await setDoc(doc(rolesRef, "Admin"), adminPermissions);
+                    return; // Let the listener re-trigger initialization
+                }
+
+                // If no users exist, create a default Admin user and return.
+                // The onSnapshot listener will re-trigger this function.
+                if (users.length === 0) {
+                    console.log("No users found. Creating default Admin user...");
+                    const usersRef = collection(db, `artifacts/${appId}/public/data/users`);
+                    const defaultUser = {
+                        name: 'کاربر ادمین',
+                        email: 'admin@example.com',
+                        password: 'password', // Note: Storing plaintext passwords is not secure. For demo only.
+                        role: 'Admin' // Reference the role by its known ID.
+                    };
+                    await addDoc(usersRef, defaultUser);
+                    return; // Let the listener re-trigger initialization
+                }
+                
                 appInitialized = true; // Prevent this from running again
                 
-                // Find the full user profile from Firestore and merge with auth data
-                const userProfile = users.find(u => u.email === authUser.email) || users[0]; // Fallback to first user for demo
-                if (userProfile) {
-                    currentUser = { ...authUser, ...userProfile };
-                } else {
-                    // Handle case where user exists in Auth but not in Firestore DB
-                    // For now, we'll assign a default role or show an error
-                    console.warn("User profile not found in Firestore, assigning default permissions.");
-                    currentUser = authUser;
-                    currentUser.role = 'Analyst'; // Default fallback role
-                }
+                // For anonymous auth, we will default to the first user in the database.
+                const userProfile = users[0]; 
+                currentUser = { ...authUser, ...userProfile };
 
                 console.log("App is ready! Initializing UI with user:", currentUser);
                 
@@ -393,8 +415,12 @@
             if (unsubscribeUsers) unsubscribeUsers();
             unsubscribeUsers = onSnapshot(usersRef, (snapshot) => {
                 users = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                usersLoaded = true;
-                checkAndInitializeApp(); // Check if we can start the app
+                if (!usersLoaded) {
+                    usersLoaded = true;
+                    checkAndInitializeApp();
+                } else if (appInitialized) {
+                    renderUsersTable();
+                }
             });
 
             if (unsubscribeRoles) unsubscribeRoles();
@@ -403,8 +429,13 @@
                 snapshot.docs.forEach(doc => {
                     roles[doc.id] = { id: doc.id, ...doc.data() };
                 });
-                rolesLoaded = true;
-                checkAndInitializeApp(); // Check if we can start the app
+                if (!rolesLoaded) {
+                    rolesLoaded = true;
+                    checkAndInitializeApp();
+                } else if (appInitialized) {
+                    renderRolesSection();
+                    applyPermissions();
+                }
             });
         }
         
