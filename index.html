@@ -367,7 +367,7 @@
         // --- CORE APP LOGIC ---
         async function initializeAppForUser(user) {
             authUser = user;
-            appInitialized = false; // Reset initialization flag
+            appInitialized = false;
             const appId = firebaseConfig.projectId;
             const rolesRef = collection(db, `artifacts/${appId}/public/data/roles`);
             const usersRef = collection(db, `artifacts/${appId}/public/data/users`);
@@ -386,8 +386,11 @@
             if (rolesSnapshot.empty) {
                 console.log("No roles found. Creating default Admin role...");
                 await setDoc(doc(rolesRef, "Admin"), { name: 'ادمین کل', permissions: Object.keys(allPermissions) });
-                // This will cause the roles listener to fire, which will re-run the logic
-                return; 
+                // Re-fetch roles to continue initialization
+                const newRolesSnapshot = await getDocs(rolesRef);
+                newRolesSnapshot.forEach(doc => {
+                    roles[doc.id] = { id: doc.id, ...doc.data() };
+                });
             }
 
             let userProfile = users.find(u => u.uid === authUser.uid);
@@ -402,9 +405,9 @@
                     role: isFirstUser ? 'Admin' : 'Analyst', // First user becomes Admin
                     uid: authUser.uid
                 };
-                await addDoc(usersRef, newUserProfile);
-                // After adding, the user listener will fire and re-run the logic with the new user.
-                return;
+                const docRef = await addDoc(usersRef, newUserProfile);
+                userProfile = { id: docRef.id, ...newUserProfile };
+                users.push(userProfile); // Add new user to local array
             }
             
             currentUser = { ...authUser, ...userProfile };
