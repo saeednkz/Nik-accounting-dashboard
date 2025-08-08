@@ -1,76 +1,110 @@
-// Import the Google Sheets API library
-const { google } = require('googleapis');
+import { initializeApp, getApps, cert } from 'firebase-admin/app';
+import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 
+// --- Firebase Admin SDK Initialization ---
+const serviceAccount = {
+  projectId: process.env.FIREBASE_PROJECT_ID,
+  clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+  privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+};
+
+if (!getApps().length) {
+  initializeApp({
+    credential: cert(serviceAccount)
+  });
+}
+
+const db = getFirestore();
+
+// --- Main API Handler ---
 export default async function handler(request, response) {
-    // Ensure the request is a POST request
+    // 1. Security Check
     if (request.method !== 'POST') {
         return response.status(405).send({ message: 'Only POST requests allowed' });
     }
+    const secret = request.headers['x-sync-secret'];
+    if (secret !== process.env.SYNC_SECRET_KEY) {
+        return response.status(401).send({ message: 'Unauthorized' });
+    }
 
     try {
-        // Get the transaction data from the request body
-        const transaction = request.body;
+        const transactionsFromSheet = request.body;
+        const appId = process.env.FIREBASE_PROJECT_ID;
+        const transactionsRef = db.collection(`artifacts/${appId}/public/data/transactions`);
 
-        // --- Authentication with Google ---
-        const auth = new google.auth.GoogleAuth({
-            credentials: {
-                client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-                // Replace \n with actual newlines
-                private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-            },
-            scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+        // Get all existing transactions to calculate pool values correctly
+        const snapshot = await transactionsRef.get();
+        const allTransactions = snapshot.docs.map(doc => {
+            const data = doc.data();
+            return {...data, orderdate: data.orderdate.toDate()};
         });
-
-        const sheets = google.sheets({ version: 'v4', auth });
-
-        // --- Prepare the data row ---
-        // The order of items in this array MUST match the order of columns in your Google Sheet
-        const rowData = [
-            transaction.orderid || '',
-            new Date(transaction.orderdate).toLocaleString('fa-IR'),
-            transaction.userid || '',
-            transaction.first_name || '',
-            transaction.last_name || '',
-            transaction.Mobile || '',
-            transaction.Email || '',
-            transaction.service_slug || '',
-            transaction.categories_title || '',
-            transaction.services_type || '',
-            transaction.currency || '',
-            transaction.currencie_slug || '',
-            transaction['Source Wallet Address'] || '',
-            transaction['Destination Wallet Address'] || '',
-            transaction.Txid || '',
-            transaction.currency_amount || 0,
-            transaction['Is Crypto?'] ? 'Yes' : 'No',
-            transaction.crypto_total_usdt || 0,
-            transaction.currency_price || 0,
-            transaction.Cost_Basis || 0,
-            transaction['Network Wage'] || 0,
-            transaction['ActualNetwork Wage'] || 0,
-            transaction['Fix Wage'] || 0,
-            transaction['Total Amount'] || 0,
-            transaction['Vip Amount'] || 0,
-            transaction['Voucher Amount'] || 0,
-            transaction['Vouchers Code'] || '',
-            transaction.description || '',
-            transaction.NetProfit || 0,
-        ];
         
-        // --- Append the row to the Google Sheet ---
-        await sheets.spreadsheets.values.append({
-            spreadsheetId: process.env.GOOGLE_SHEET_ID,
-            range: 'Sheet1!A2', // Assumes your data starts from row 2 in a sheet named 'Sheet1'
-            valueInputOption: 'USER_ENTERED',
-            requestBody: {
-                values: [rowData],
-            },
-        });
+        // Process each new transaction from the sheet
+        for (const tx of transactionsFromSheet) {
+            const currentPools = {};
+            const sortedTransactions = [...allTransactions].sort((a, b) => new Date(a.orderdate) - new Date(b.orderdate));
+            sortedTransactions.forEach(t => processTransactionForPool(t, currentPools));
+            
+            const pool = currentPools[tx.currencie_slug] || { weightedAvgCost: 0 };
+            
+            // --- Calculations ---
+            const currency_price = parseFloat(tx.currency_price) || 0;
+            const currency_amount = parseFloat(tx.currency_amount) || 0;
+            const Vip_Amount = parseFloat(tx['Vip Amount']) || 0;
+            const Fix_Wage = parseFloat(tx['Fix Wage']) || 0;
+            const Network_Wage = parseFloat(tx['Network Wage']) || 0;
+            const ActualNetwork_Wage = parseFloat(tx['ActualNetwork Wage']) || 0;
+            const Total_Amount = parseFloat(tx['Total Amount']) || 0;
+            
+            const costBasis = tx.services_type === 'buy' ? currency_price : (pool.weightedAvgCost > 0 ? pool.weightedAvgCost : currency_price * 0.98);
+            const netProfit = tx.services_type === 'buy' 
+                ? Vip_Amount + Fix_Wage + (Network_Wage - ActualNetwork_Wage)
+                : Total_Amount - ((costBasis * currency_amount) + ActualNetwork_Wage);
 
-        return response.status(200).json({ success: true });
+            // Prepare data for Firestore
+            const firestoreTx = {
+                ...tx,
+                orderdate: Timestamp.fromDate(new Date(tx.orderdate)),
+                createdAt: Timestamp.now(),
+                Cost_Basis: costBasis,
+                NetProfit: netProfit
+            };
+
+            // Convert string numbers to actual numbers
+            Object.keys(firestoreTx).forEach(key => {
+                const val = firestoreTx[key];
+                if (typeof val === 'string' && !isNaN(val) && val.trim() !== '') {
+                    // Exclude fields that should remain strings like Mobile, orderid
+                    if (!['Mobile', 'orderid', 'uid', 'role', 'name', 'email'].includes(key) && !key.includes('Address') && !key.includes('slug') && !key.includes('Code')) {
+                         firestoreTx[key] = parseFloat(val);
+                    }
+                }
+            });
+            
+            await transactionsRef.add(firestoreTx);
+            
+            allTransactions.push({...firestoreTx, orderdate: firestoreTx.orderdate.toDate()});
+        }
+
+        return response.status(200).json({ success: true, message: `${transactionsFromSheet.length} transactions synced.` });
 
     } catch (error) {
-        console.error('Error writing to Google Sheet:', error);
-        return response.status(500).send({ message: 'Error writing to Google Sheet', error: error.message });
+        console.error('Error syncing from Google Sheet:', error);
+        return response.status(500).send({ message: 'Error syncing data', error: error.message });
+    }
+}
+
+// Helper function to calculate pool values
+function processTransactionForPool(t, pools) {
+    if (!pools[t.currencie_slug]) {
+        pools[t.currencie_slug] = { quantity: 0, weightedAvgCost: 0 };
+    }
+    const pool = pools[t.currencie_slug];
+    if (t.services_type === 'buy') {
+        const newTotalQty = pool.quantity + t.currency_amount;
+        pool.weightedAvgCost = newTotalQty > 0 ? ((pool.quantity * pool.weightedAvgCost) + (t.currency_amount * t.currency_price)) / newTotalQty : 0;
+        pool.quantity = newTotalQty;
+    } else {
+        pool.quantity -= t.currency_amount;
     }
 }
