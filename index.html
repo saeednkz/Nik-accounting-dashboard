@@ -328,11 +328,10 @@
     <!-- Firebase SDK -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithEmailAndPassword, signOut, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, getDoc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, where, getDocs, serverTimestamp, Timestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- IMPORTANT: PASTE YOUR FIREBASE CONFIGURATION HERE ---
-        // Find this in your Firebase project settings > General tab > Your apps > SDK setup and configuration
         const firebaseConfig = {
             apiKey: "AIzaSyCnI4Pe7kI41sa6NpnVXIOStsTOpBh7JDg",
             authDomain: "nik-accounting-app.firebaseapp.com",
@@ -349,14 +348,10 @@
         let currencyPools = {};
         let users = [];
         let roles = {};
-        let currentUser = null; // This will hold the full user object from Firestore
-        let authUser = null; // This will hold the auth object from Firebase Auth
+        let currentUser = null;
+        let authUser = null;
         
         let unsubscribeTransactions, unsubscribeUsers, unsubscribeRoles;
-
-        // --- APP INITIALIZATION STATE ---
-        let rolesLoaded = false;
-        let usersLoaded = false;
         let appInitialized = false;
 
         // --- DOM Elements ---
@@ -366,58 +361,63 @@
         const loginForm = document.getElementById('login-form');
         const loginError = document.getElementById('login-error');
         const logoutBtn = document.getElementById('logout-btn');
+        const allPermissions = { view_dashboard: 'مشاهده داشبورد', view_transactions: 'مشاهده تراکنش‌ها', edit_transactions: 'اصلاح تراکنش‌ها', create_transactions: 'ایجاد تراکنش', export_data: 'خروجی داده', manage_users: 'مدیریت کاربران', manage_pools: 'مدیریت استخرها' };
+
 
         // --- CORE APP LOGIC ---
-        async function checkAndInitializeApp() {
-            if (rolesLoaded && usersLoaded && !appInitialized) {
-                const appId = firebaseConfig.projectId;
-                
-                if (Object.keys(roles).length === 0) {
-                    console.log("No roles found. Creating default Admin role...");
-                    const rolesRef = collection(db, `artifacts/${appId}/public/data/roles`);
-                    await setDoc(doc(rolesRef, "Admin"), { name: 'ادمین کل', permissions: Object.keys(allPermissions) });
-                    return; 
-                }
+        async function initializeAppForUser(user) {
+            authUser = user;
+            const appId = firebaseConfig.projectId;
+            const rolesRef = collection(db, `artifacts/${appId}/public/data/roles`);
+            const usersRef = collection(db, `artifacts/${appId}/public/data/users`);
 
-                if (users.length === 0) {
-                    console.log("No users found. Creating default Admin user in Auth and Firestore...");
-                    try {
-                        const userCredential = await createUserWithEmailAndPassword(auth, 'admin@example.com', 'password');
-                        const usersRef = collection(db, `artifacts/${appId}/public/data/users`);
-                        const defaultUser = {
-                            name: 'کاربر ادمین',
-                            email: 'admin@example.com',
-                            role: 'Admin',
-                            uid: userCredential.user.uid
-                        };
-                        await addDoc(usersRef, defaultUser);
-                    } catch (error) {
-                        if (error.code !== 'auth/email-already-in-use') {
-                           console.error("Error creating default user:", error);
-                        }
-                    }
-                    return;
-                }
-                
-                appInitialized = true;
-                
-                const userProfile = users.find(u => u.uid === authUser.uid); 
-                if (userProfile) {
-                    currentUser = { ...authUser, ...userProfile };
-                } else {
-                    console.warn(`User profile for ${authUser.email} not found in Firestore. Granting no permissions.`);
-                    currentUser = authUser;
-                    currentUser.role = null;
-                }
+            // Fetch roles and users once
+            const rolesSnapshot = await getDocs(rolesRef);
+            roles = {};
+            rolesSnapshot.forEach(doc => {
+                roles[doc.id] = { id: doc.id, ...doc.data() };
+            });
 
-                console.log("App is ready! Initializing UI with user:", currentUser);
-                
-                loginPage.classList.add('hidden');
-                mainApp.classList.remove('hidden');
-                loadingOverlay.style.display = 'none';
+            const usersSnapshot = await getDocs(usersRef);
+            users = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-                initializeUI();
+            // Seed database if empty
+            if (rolesSnapshot.empty) {
+                console.log("No roles found. Creating default Admin role...");
+                await setDoc(doc(rolesRef, "Admin"), { name: 'ادمین کل', permissions: Object.keys(allPermissions) });
+                // No need to return, the data will be re-fetched on next login attempt
             }
+            if (usersSnapshot.empty) {
+                console.log("No users found. Creating default Admin user in Firestore (Auth user should be created manually)...");
+                const defaultUser = {
+                    name: 'کاربر ادمین',
+                    email: 'admin@example.com',
+                    role: 'Admin',
+                    uid: 'MANUALLY_ADD_UID_FROM_AUTH_CONSOLE' // IMPORTANT
+                };
+                await addDoc(usersRef, defaultUser);
+            }
+
+            const userProfile = users.find(u => u.uid === authUser.uid);
+            if (userProfile) {
+                currentUser = { ...authUser, ...userProfile };
+            } else {
+                console.warn(`User profile for ${authUser.email} not found in Firestore. Logging out.`);
+                handleLogout();
+                loginError.textContent = "پروفایل کاربری شما در پایگاه داده یافت نشد.";
+                loginError.classList.remove('hidden');
+                return;
+            }
+
+            console.log("App is ready! Initializing UI with user:", currentUser);
+            appInitialized = true;
+            
+            loginPage.classList.add('hidden');
+            mainApp.classList.remove('hidden');
+            loadingOverlay.style.display = 'none';
+
+            initializeUI();
+            setupRealtimeListeners();
         }
 
         function initializeUI() {
@@ -440,11 +440,7 @@
             unsubscribeTransactions = onSnapshot(transactionsRef, (snapshot) => {
                 ALL_TRANSACTIONS = snapshot.docs.map(doc => {
                     const data = doc.data();
-                    return {
-                        ...data,
-                        id: doc.id,
-                        orderdate: data.orderdate instanceof Timestamp ? data.orderdate.toDate() : new Date(data.orderdate)
-                    };
+                    return { ...data, id: doc.id, orderdate: data.orderdate.toDate() };
                 });
                 processAllTransactionsForPools();
                 if(appInitialized) {
@@ -456,24 +452,14 @@
             if (unsubscribeUsers) unsubscribeUsers();
             unsubscribeUsers = onSnapshot(usersRef, (snapshot) => {
                 users = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                if (!usersLoaded) {
-                    usersLoaded = true;
-                    checkAndInitializeApp();
-                } else if (appInitialized) {
-                    renderUsersTable();
-                }
+                if (appInitialized) renderUsersTable();
             });
 
             if (unsubscribeRoles) unsubscribeRoles();
             unsubscribeRoles = onSnapshot(rolesRef, (snapshot) => {
                 roles = {};
-                snapshot.docs.forEach(doc => {
-                    roles[doc.id] = { id: doc.id, ...doc.data() };
-                });
-                if (!rolesLoaded) {
-                    rolesLoaded = true;
-                    checkAndInitializeApp();
-                } else if (appInitialized) {
+                snapshot.docs.forEach(doc => { roles[doc.id] = { id: doc.id, ...doc.data() }; });
+                if (appInitialized) {
                     renderRolesSection();
                     applyPermissions();
                 }
@@ -996,8 +982,6 @@
             detailsModal.classList.remove('hidden');
         }
 
-        const allPermissions = { view_dashboard: 'مشاهده داشبورد', view_transactions: 'مشاهده تراکنش‌ها', edit_transactions: 'اصلاح تراکنش‌ها', create_transactions: 'ایجاد تراکنش', export_data: 'خروجی داده', manage_users: 'مدیریت کاربران', manage_pools: 'مدیریت استخرها' };
-
         function setupUsersPage() {
             document.getElementById('add-user-btn').addEventListener('click', () => openUserModal());
             document.getElementById('add-role-btn').addEventListener('click', () => openRoleModal());
@@ -1170,16 +1154,11 @@
 
             onAuthStateChanged(auth, (user) => {
                 if (user && !user.isAnonymous) {
-                    authUser = user;
-                    mainApp.classList.add('hidden'); // Hide app until data is loaded
-                    loadingOverlay.style.display = 'flex';
-                    setupRealtimeListeners();
+                    initializeAppForUser(user);
                 } else {
                     currentUser = null;
                     authUser = null;
                     appInitialized = false;
-                    usersLoaded = false;
-                    rolesLoaded = false;
                     if(unsubscribeTransactions) unsubscribeTransactions();
                     if(unsubscribeUsers) unsubscribeUsers();
                     if(unsubscribeRoles) unsubscribeRoles();
