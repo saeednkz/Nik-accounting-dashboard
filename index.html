@@ -367,6 +367,7 @@
         // --- CORE APP LOGIC ---
         async function initializeAppForUser(user) {
             authUser = user;
+            appInitialized = false; // Reset initialization flag
             const appId = firebaseConfig.projectId;
             const rolesRef = collection(db, `artifacts/${appId}/public/data/roles`);
             const usersRef = collection(db, `artifacts/${appId}/public/data/users`);
