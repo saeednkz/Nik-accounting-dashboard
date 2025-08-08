@@ -88,14 +88,35 @@
         <p class="mt-4 text-slate-400">در حال بارگذاری و اتصال به سرور...</p>
     </div>
 
-    <div class="flex h-screen p-4 gap-4">
+    <div id="login-page" class="hidden h-screen w-screen flex items-center justify-center p-4">
+        <div class="w-full max-w-sm">
+            <form id="login-form" class="glass-card rounded-2xl p-8 space-y-6">
+                <div class="text-center">
+                    <svg class="h-12 w-12 text-cyan-400 mx-auto" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18.5 8.5C18.5 9.88071 17.3807 11 16 11H8C6.61929 11 5.5 9.88071 5.5 8.5C5.5 7.11929 6.61929 6 8 6H16C17.3807 6 18.5 7.11929 18.5 8.5Z" stroke="currentColor" stroke-width="1.5"/><path d="M18.5 15.5C18.5 16.8807 17.3807 18 16 18H8C6.61929 18 5.5 16.8807 5.5 15.5C5.5 14.1193 6.61929 13 8 13H16C17.3807 13 18.5 14.1193 18.5 15.5Z" stroke="currentColor" stroke-width="1.5"/><path d="M12 3V21" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    <h2 class="mt-4 text-2xl font-bold text-slate-100">ورود به داشبورد</h2>
+                </div>
+                <div id="login-error" class="hidden text-center bg-red-500/20 text-red-300 text-sm p-3 rounded-lg"></div>
+                <div>
+                    <label for="email" class="block mb-2 text-sm font-medium text-slate-400">ایمیل</label>
+                    <input type="email" name="email" id="email" class="bg-slate-800/50 border border-slate-700 text-slate-300 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block w-full p-2.5" placeholder="admin@example.com" required>
+                </div>
+                <div>
+                    <label for="password" class="block mb-2 text-sm font-medium text-slate-400">رمز عبور</label>
+                    <input type="password" name="password" id="password" placeholder="••••••••" class="bg-slate-800/50 border border-slate-700 text-slate-300 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block w-full p-2.5" required>
+                </div>
+                <button type="submit" class="w-full text-white bg-cyan-600 hover:bg-cyan-700 focus:ring-4 focus:outline-none focus:ring-cyan-800 font-medium rounded-lg text-sm px-5 py-3 text-center">ورود</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="main-app" class="hidden flex h-screen p-4 gap-4">
         <!-- Sidebar -->
         <aside class="w-20 shrink-0 glass-card rounded-2xl flex flex-col items-center py-6 transition-all duration-300 group hover:w-64">
              <div class="flex items-center justify-center h-12 mb-8">
                 <svg class="h-9 w-9 text-cyan-400 shrink-0" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18.5 8.5C18.5 9.88071 17.3807 11 16 11H8C6.61929 11 5.5 9.88071 5.5 8.5C5.5 7.11929 6.61929 6 8 6H16C17.3807 6 18.5 7.11929 18.5 8.5Z" stroke="currentColor" stroke-width="1.5"/><path d="M18.5 15.5C18.5 16.8807 17.3807 18 16 18H8C6.61929 18 5.5 16.8807 5.5 15.5C5.5 14.1193 6.61929 13 8 13H16C17.3807 13 18.5 14.1193 18.5 15.5Z" stroke="currentColor" stroke-width="1.5"/><path d="M12 3V21" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
                 <h1 class="text-2xl font-bold mr-4 text-slate-100 opacity-0 max-w-0 group-hover:opacity-100 group-hover:max-w-xs transition-all duration-300 whitespace-nowrap overflow-hidden">حسابداری</h1>
             </div>
-            <nav class="flex flex-col space-y-3 w-full px-4">
+            <nav class="flex flex-col space-y-3 w-full px-4 flex-grow">
                 <a href="#" id="nav-dashboard" class="nav-link flex items-center p-3 rounded-lg text-slate-400 hover:bg-slate-700/50">
                     <svg class="h-6 w-6 shrink-0" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 3H4V10H10V3Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 3H14V10H20V3Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 14H4V21H10V14Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 14H14V21H20V14Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
                     <span class="mr-4 opacity-0 max-w-0 group-hover:opacity-100 group-hover:max-w-full transition-all duration-300 whitespace-nowrap overflow-hidden">داشبورد</span>
@@ -113,6 +134,12 @@
                     <span class="mr-4 opacity-0 max-w-0 group-hover:opacity-100 group-hover:max-w-full transition-all duration-300 whitespace-nowrap overflow-hidden">مدیریت کاربران</span>
                 </a>
             </nav>
+            <div class="mt-auto w-full px-4">
+                 <button id="logout-btn" class="nav-link flex w-full items-center p-3 rounded-lg text-slate-400 hover:bg-red-500/20 hover:text-red-300">
+                    <svg class="h-6 w-6 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" /></svg>
+                    <span class="mr-4 opacity-0 max-w-0 group-hover:opacity-100 group-hover:max-w-full transition-all duration-300 whitespace-nowrap overflow-hidden">خروج</span>
+                </button>
+            </div>
         </aside>
 
         <!-- Main Content -->
@@ -301,7 +328,7 @@
     <!-- Firebase SDK -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithEmailAndPassword, signOut, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, getDoc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, where, getDocs, serverTimestamp, Timestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- IMPORTANT: PASTE YOUR FIREBASE CONFIGURATION HERE ---
@@ -332,50 +359,63 @@
         let usersLoaded = false;
         let appInitialized = false;
 
+        // --- DOM Elements ---
+        const loadingOverlay = document.getElementById('loading-overlay');
+        const loginPage = document.getElementById('login-page');
+        const mainApp = document.getElementById('main-app');
+        const loginForm = document.getElementById('login-form');
+        const loginError = document.getElementById('login-error');
+        const logoutBtn = document.getElementById('logout-btn');
+
         // --- CORE APP LOGIC ---
         async function checkAndInitializeApp() {
-            // This function runs after each data type is loaded.
-            // It only initializes the main UI when ALL required data is ready.
             if (rolesLoaded && usersLoaded && !appInitialized) {
                 const appId = firebaseConfig.projectId;
                 
-                // If no roles exist, create a default Admin role and return.
-                // The onSnapshot listener will re-trigger this function.
                 if (Object.keys(roles).length === 0) {
                     console.log("No roles found. Creating default Admin role...");
                     const rolesRef = collection(db, `artifacts/${appId}/public/data/roles`);
-                    const adminPermissions = {
-                        name: 'ادمین کل',
-                        permissions: Object.keys(allPermissions)
-                    };
-                    await setDoc(doc(rolesRef, "Admin"), adminPermissions);
-                    return; // Let the listener re-trigger initialization
+                    await setDoc(doc(rolesRef, "Admin"), { name: 'ادمین کل', permissions: Object.keys(allPermissions) });
+                    return; 
                 }
 
-                // If no users exist, create a default Admin user and return.
-                // The onSnapshot listener will re-trigger this function.
                 if (users.length === 0) {
-                    console.log("No users found. Creating default Admin user...");
-                    const usersRef = collection(db, `artifacts/${appId}/public/data/users`);
-                    const defaultUser = {
-                        name: 'کاربر ادمین',
-                        email: 'admin@example.com',
-                        password: 'password', // Note: Storing plaintext passwords is not secure. For demo only.
-                        role: 'Admin' // Reference the role by its known ID.
-                    };
-                    await addDoc(usersRef, defaultUser);
-                    return; // Let the listener re-trigger initialization
+                    console.log("No users found. Creating default Admin user in Auth and Firestore...");
+                    try {
+                        const userCredential = await createUserWithEmailAndPassword(auth, 'admin@example.com', 'password');
+                        const usersRef = collection(db, `artifacts/${appId}/public/data/users`);
+                        const defaultUser = {
+                            name: 'کاربر ادمین',
+                            email: 'admin@example.com',
+                            role: 'Admin',
+                            uid: userCredential.user.uid
+                        };
+                        await addDoc(usersRef, defaultUser);
+                    } catch (error) {
+                        if (error.code !== 'auth/email-already-in-use') {
+                           console.error("Error creating default user:", error);
+                        }
+                    }
+                    return;
                 }
                 
-                appInitialized = true; // Prevent this from running again
+                appInitialized = true;
                 
-                // For anonymous auth, we will default to the first user in the database.
-                const userProfile = users[0]; 
-                currentUser = { ...authUser, ...userProfile };
+                const userProfile = users.find(u => u.uid === authUser.uid); 
+                if (userProfile) {
+                    currentUser = { ...authUser, ...userProfile };
+                } else {
+                    console.warn(`User profile for ${authUser.email} not found in Firestore. Granting no permissions.`);
+                    currentUser = authUser;
+                    currentUser.role = null;
+                }
 
                 console.log("App is ready! Initializing UI with user:", currentUser);
                 
-                document.getElementById('loading-overlay').style.display = 'none';
+                loginPage.classList.add('hidden');
+                mainApp.classList.remove('hidden');
+                loadingOverlay.style.display = 'none';
+
                 initializeUI();
             }
         }
@@ -386,7 +426,7 @@
             setupUsersPage();
             applyPermissions();
             switchPage('dashboard');
-            updateDashboardView(); // Render dashboard with initial data
+            updateDashboardView();
         }
 
         // --- REALTIME LISTENERS ---
@@ -407,7 +447,7 @@
                     };
                 });
                 processAllTransactionsForPools();
-                if(appInitialized) { // Only update UI if app is already running
+                if(appInitialized) {
                     filterAndRenderTransactions();
                     updateDashboardView();
                 }
@@ -1025,15 +1065,24 @@
             const formData = new FormData(e.target);
             const data = Object.fromEntries(formData.entries());
             const userData = { name: data.name, email: data.email, role: data.role };
-            if (data.password) userData.password = data.password;
             try {
-                if (data.id) {
+                if (data.id) { // Edit user in Firestore
+                    if (data.password) {
+                        // In a real app, you would need a cloud function to update the user's password in Firebase Auth.
+                        // For now, we'll just store it in Firestore (which is not secure).
+                        userData.password = data.password;
+                    }
                     await setDoc(doc(db, `artifacts/${appId}/public/data/users`, data.id), userData, { merge: true });
-                } else {
+                } else { // Create new user
+                    const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
+                    userData.uid = userCredential.user.uid;
                     await addDoc(collection(db, `artifacts/${appId}/public/data/users`), userData);
                 }
                 closeModal();
-            } catch (error) { console.error("Error saving user:", error); }
+            } catch (error) { 
+                console.error("Error saving user:", error); 
+                alert("خطا در ذخیره کاربر: " + error.message);
+            }
         }
 
         function confirmDeleteUser(user) {
@@ -1047,6 +1096,7 @@
         }
 
         async function deleteUser(userId) {
+            // Note: This only deletes the user from Firestore. In a real app, you'd need a cloud function to delete the user from Firebase Auth.
             const appId = firebaseConfig.projectId;
             try {
                 await deleteDoc(doc(db, `artifacts/${appId}/public/data/users`, userId));
@@ -1077,38 +1127,65 @@
             const formData = new FormData(e.target);
             const name = formData.get('name');
             const permissions = formData.getAll('permissions');
-            const roleId = formData.get('id');
+            const roleId = formData.get('id') || name.replace(/\s+/g, '_'); // Use name to create an ID if new
             const roleData = { name, permissions };
             try {
-                if (roleId) {
-                    await setDoc(doc(db, `artifacts/${appId}/public/data/roles`, roleId), roleData);
-                } else {
-                    await addDoc(collection(db, `artifacts/${appId}/public/data/roles`), roleData);
-                }
+                await setDoc(doc(db, `artifacts/${appId}/public/data/roles`, roleId), roleData);
                 closeModal();
             } catch (error) { console.error("Error saving role:", error); }
+        }
+
+        // --- AUTHENTICATION FLOW ---
+        function handleLogin(e) {
+            e.preventDefault();
+            const email = loginForm.email.value;
+            const password = loginForm.password.value;
+            loginError.classList.add('hidden');
+
+            signInWithEmailAndPassword(auth, email, password)
+                .catch(error => {
+                    console.error("Login failed:", error);
+                    loginError.textContent = "ایمیل یا رمز عبور اشتباه است.";
+                    loginError.classList.remove('hidden');
+                });
+        }
+
+        function handleLogout() {
+            signOut(auth).catch(error => console.error("Logout failed:", error));
         }
 
         // --- INITIALIZATION ---
         async function init() {
             if (!firebaseConfig.apiKey || firebaseConfig.apiKey.includes("YOUR_")) {
-                document.getElementById('loading-overlay').innerHTML = '<p class="text-red-400 text-center">پیکربندی Firebase کامل نیست.<br>لطفاً کلیدهای اتصال را در کد وارد کنید.</p>';
+                loadingOverlay.innerHTML = '<p class="text-red-400 text-center">پیکربندی Firebase کامل نیست.<br>لطفاً کلیدهای اتصال را در کد وارد کنید.</p>';
                 return;
             }
 
             const app = initializeApp(firebaseConfig);
             db = getFirestore(app);
             auth = getAuth(app);
+            
+            loginForm.addEventListener('submit', handleLogin);
+            logoutBtn.addEventListener('click', handleLogout);
 
             onAuthStateChanged(auth, (user) => {
-                if (user) {
-                    authUser = user; // Store the auth user
-                    setupRealtimeListeners(); // Start listening for data
+                if (user && !user.isAnonymous) {
+                    authUser = user;
+                    mainApp.classList.add('hidden'); // Hide app until data is loaded
+                    loadingOverlay.style.display = 'flex';
+                    setupRealtimeListeners();
                 } else {
-                    signInAnonymously(auth).catch((error) => {
-                        console.error("Anonymous sign-in failed:", error);
-                        document.getElementById('loading-overlay').innerHTML = '<p class="text-red-400 text-center">احراز هویت با سرور با مشکل مواجه شد.</p>';
-                    });
+                    currentUser = null;
+                    authUser = null;
+                    appInitialized = false;
+                    usersLoaded = false;
+                    rolesLoaded = false;
+                    if(unsubscribeTransactions) unsubscribeTransactions();
+                    if(unsubscribeUsers) unsubscribeUsers();
+                    if(unsubscribeRoles) unsubscribeRoles();
+                    mainApp.classList.add('hidden');
+                    loginPage.classList.remove('hidden');
+                    loadingOverlay.style.display = 'none';
                 }
             });
         }
