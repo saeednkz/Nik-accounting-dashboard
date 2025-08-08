@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>داشبورد حسابداری - متصل به Firebase</title>
+    <title>داشبورد حسابداری</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -301,8 +301,20 @@
     <!-- Firebase SDK -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, getDoc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, where, getDocs, serverTimestamp, Timestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- IMPORTANT: PASTE YOUR FIREBASE CONFIGURATION HERE ---
+        // Find this in your Firebase project settings > General tab > Your apps > SDK setup and configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyCnI4Pe7kI41sa6NpnVXIOStsTOpBh7JDg",
+            authDomain: "nik-accounting-app.firebaseapp.com",
+            projectId: "nik-accounting-app",
+            storageBucket: "nik-accounting-app.firebasestorage.app",
+            messagingSenderId: "144843139100",
+            appId: "Y1:144843139100:web:106b37fd9de88129dc17d9"
+        };
+        // ---------------------------------------------------------
 
         // --- GLOBAL STATE ---
         let db, auth;
@@ -323,7 +335,6 @@
                 initializeUI();
             } else {
                 console.log("User is not authenticated.");
-                // Optionally handle the unauthenticated state, e.g., show a login page
             }
         }
 
@@ -337,7 +348,7 @@
 
         // --- REALTIME LISTENERS ---
         function setupRealtimeListeners() {
-            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+            const appId = firebaseConfig.projectId; // Use projectId for path
             const transactionsRef = collection(db, `artifacts/${appId}/public/data/transactions`);
             const usersRef = collection(db, `artifacts/${appId}/public/data/users`);
             const rolesRef = collection(db, `artifacts/${appId}/public/data/roles`);
@@ -346,14 +357,12 @@
             unsubscribeTransactions = onSnapshot(transactionsRef, (snapshot) => {
                 ALL_TRANSACTIONS = snapshot.docs.map(doc => {
                     const data = doc.data();
-                    // Convert Firestore Timestamps to JS Dates
                     return {
                         ...data,
                         id: doc.id,
                         orderdate: data.orderdate instanceof Timestamp ? data.orderdate.toDate() : new Date(data.orderdate)
                     };
                 });
-                console.log("Transactions updated:", ALL_TRANSACTIONS.length);
                 processAllTransactionsForPools();
                 filterAndRenderTransactions();
                 updateDashboardView();
@@ -362,7 +371,6 @@
             if (unsubscribeUsers) unsubscribeUsers();
             unsubscribeUsers = onSnapshot(usersRef, (snapshot) => {
                 users = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                console.log("Users updated:", users.length);
                 renderUsersTable();
             });
 
@@ -372,7 +380,6 @@
                 snapshot.docs.forEach(doc => {
                     roles[doc.id] = { id: doc.id, ...doc.data() };
                 });
-                console.log("Roles updated:", Object.keys(roles).length);
                 renderRolesSection();
             });
         }
@@ -380,7 +387,6 @@
         // --- DATA PROCESSING ---
         function processAllTransactionsForPools() {
             currencyPools = {};
-            // Sort transactions by date to process them in order
             const sortedTransactions = [...ALL_TRANSACTIONS].sort((a, b) => a.orderdate - b.orderdate);
             sortedTransactions.forEach(t => processTransactionForPool(t));
         }
@@ -812,7 +818,7 @@
 
         async function handleTransactionSubmit(e) {
             e.preventDefault();
-            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+            const appId = firebaseConfig.projectId;
             const formData = new FormData(e.target);
             const data = Object.fromEntries(formData.entries());
             const txId = data.id;
@@ -955,11 +961,10 @@
 
         async function handleUserSubmit(e) {
             e.preventDefault();
-            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+            const appId = firebaseConfig.projectId;
             const formData = new FormData(e.target);
             const data = Object.fromEntries(formData.entries());
             const userData = { name: data.name, email: data.email, role: data.role };
-            // Note: In a real app, password should be hashed on the server, not stored in plaintext.
             if (data.password) userData.password = data.password;
             try {
                 if (data.id) {
@@ -982,7 +987,7 @@
         }
 
         async function deleteUser(userId) {
-            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+            const appId = firebaseConfig.projectId;
             try {
                 await deleteDoc(doc(db, `artifacts/${appId}/public/data/users`, userId));
                 closeModal();
@@ -1008,7 +1013,7 @@
 
         async function handleRoleSubmit(e) {
             e.preventDefault();
-            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+            const appId = firebaseConfig.projectId;
             const formData = new FormData(e.target);
             const name = formData.get('name');
             const permissions = formData.getAll('permissions');
@@ -1026,9 +1031,8 @@
 
         // --- INITIALIZATION ---
         async function init() {
-            const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
-            if (!firebaseConfig.apiKey) {
-                document.getElementById('loading-overlay').innerHTML = '<p class="text-red-400 text-center">پیکربندی Firebase یافت نشد.<br>لطفاً از اتصال صحیح اطمینان حاصل کنید.</p>';
+            if (!firebaseConfig.apiKey || firebaseConfig.apiKey.includes("YOUR_")) {
+                document.getElementById('loading-overlay').innerHTML = '<p class="text-red-400 text-center">پیکربندی Firebase کامل نیست.<br>لطفاً کلیدهای اتصال را در کد وارد کنید.</p>';
                 return;
             }
 
@@ -1038,24 +1042,12 @@
 
             onAuthStateChanged(auth, (user) => {
                 if (user) {
-                    // User is signed in.
                     main(user);
                 } else {
-                    // User is signed out.
-                    // Try to sign in with custom token or anonymously
-                    (async () => {
-                        try {
-                            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                                await signInWithCustomToken(auth, __initial_auth_token);
-                            } else {
-                                await signInAnonymously(auth);
-                            }
-                            // The onAuthStateChanged listener will handle the successful sign-in.
-                        } catch (error) {
-                            console.error("Authentication failed:", error);
-                            document.getElementById('loading-overlay').innerHTML = '<p class="text-red-400 text-center">احراز هویت با سرور با مشکل مواجه شد.</p>';
-                        }
-                    })();
+                    signInAnonymously(auth).catch((error) => {
+                        console.error("Anonymous sign-in failed:", error);
+                        document.getElementById('loading-overlay').innerHTML = '<p class="text-red-400 text-center">احراز هویت با سرور با مشکل مواجه شد.</p>';
+                    });
                 }
             });
         }
