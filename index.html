@@ -331,16 +331,14 @@
         import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, getDoc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, where, getDocs, serverTimestamp, Timestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // --- IMPORTANT: PASTE YOUR FIREBASE CONFIGURATION HERE ---
         const firebaseConfig = {
             apiKey: "AIzaSyCnI4Pe7kI41sa6NpnVXIOStsTOpBh7JDg",
             authDomain: "nik-accounting-app.firebaseapp.com",
             projectId: "nik-accounting-app",
-            storageBucket: "nik-accounting-app.firebasestorage.app",
+            storageBucket: "nik-accounting-app.appspot.com",
             messagingSenderId: "144843139100",
-            appId: "Y1:144843139100:web:106b37fd9de88129dc17d9"
+            appId: "1:144843139100:web:106b37fd9de88129dc17d9"
         };
-        // ---------------------------------------------------------
 
         // --- GLOBAL STATE ---
         let db, auth;
@@ -371,7 +369,6 @@
             const rolesRef = collection(db, `artifacts/${appId}/public/data/roles`);
             const usersRef = collection(db, `artifacts/${appId}/public/data/users`);
 
-            // Fetch roles and users once
             const rolesSnapshot = await getDocs(rolesRef);
             roles = {};
             rolesSnapshot.forEach(doc => {
@@ -381,11 +378,9 @@
             const usersSnapshot = await getDocs(usersRef);
             users = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-            // Seed roles if empty, then re-trigger auth state change to re-run this function
             if (rolesSnapshot.empty) {
                 console.log("No roles found. Creating default Admin role...");
                 await setDoc(doc(rolesRef, "Admin"), { name: 'ادمین کل', permissions: Object.keys(allPermissions) });
-                // Re-fetch roles to continue initialization
                 const newRolesSnapshot = await getDocs(rolesRef);
                 newRolesSnapshot.forEach(doc => {
                     roles[doc.id] = { id: doc.id, ...doc.data() };
@@ -394,19 +389,18 @@
 
             let userProfile = users.find(u => u.uid === authUser.uid);
 
-            // If user profile doesn't exist in Firestore, create it.
             if (!userProfile) {
                 console.log(`User profile for ${authUser.email} not found. Creating one now...`);
                 const isFirstUser = users.length === 0;
                 const newUserProfile = {
                     name: authUser.displayName || authUser.email.split('@')[0],
                     email: authUser.email,
-                    role: isFirstUser ? 'Admin' : 'Analyst', // First user becomes Admin
+                    role: isFirstUser ? 'Admin' : 'Analyst',
                     uid: authUser.uid
                 };
                 const docRef = await addDoc(usersRef, newUserProfile);
                 userProfile = { id: docRef.id, ...newUserProfile };
-                users.push(userProfile); // Add new user to local array
+                users.push(userProfile);
             }
             
             currentUser = { ...authUser, ...userProfile };
@@ -442,16 +436,25 @@
             unsubscribeTransactions = onSnapshot(transactionsRef, (snapshot) => {
                 ALL_TRANSACTIONS = snapshot.docs.map(doc => {
                     const data = doc.data();
-                   // ...
-unsubscribeTransactions = onSnapshot(transactionsRef, (snapshot) => {
-    ALL_TRANSACTIONS = snapshot.docs.map(doc => {
-        const data = doc.data();
-        // This line handles both Timestamp and String dates
-        const dateObject = data.orderdate && data.orderdate.toDate ? data.orderdate.toDate() : new Date(data.orderdate);
-        return { ...data, id: doc.id, orderdate: dateObject };
-    });
-    processAllTransactionsForPools();
-// ...
+                    
+                    // *** ROBUST DATE HANDLING ***
+                    let dateObject = null;
+                    if (data.orderdate) {
+                        if (typeof data.orderdate.toDate === 'function') {
+                            // It's a proper Firestore Timestamp
+                            dateObject = data.orderdate.toDate();
+                        } else {
+                            // Fallback for strings or other formats from Google Sheets
+                            dateObject = new Date(data.orderdate);
+                        }
+                    }
+                    // Prevent crash on invalid dates
+                    if (!dateObject || isNaN(dateObject)) {
+                        console.error("Invalid date format for transaction ID:", doc.id, data);
+                        dateObject = new Date(); // Use current date as a safe fallback
+                    }
+
+                    return { ...data, id: doc.id, orderdate: dateObject };
                 });
                 processAllTransactionsForPools();
                 if(appInitialized) {
@@ -485,6 +488,7 @@ unsubscribeTransactions = onSnapshot(transactionsRef, (snapshot) => {
         }
 
         function processTransactionForPool(t) {
+            if (!t.currencie_slug) return;
             if (!currencyPools[t.currencie_slug]) {
                 currencyPools[t.currencie_slug] = { quantity: 0, weightedAvgCost: 0, log: [] };
             }
@@ -516,7 +520,10 @@ unsubscribeTransactions = onSnapshot(transactionsRef, (snapshot) => {
             if (isNaN(value)) { return '0'; }
             return new Intl.NumberFormat('fa-IR').format(value.toFixed(decimals));
         };
-        const formatDate = (date) => new Date(date).toLocaleDateString('fa-IR', { year: 'numeric', month: '2-digit', day: '2-digit' });
+        const formatDate = (date) => {
+            if (!(date instanceof Date) || isNaN(date)) return "تاریخ نامعتبر";
+            return date.toLocaleDateString('fa-IR', { year: 'numeric', month: '2-digit', day: '2-digit' });
+        }
         
         let updateDashboardView = () => {};
 
@@ -535,6 +542,11 @@ unsubscribeTransactions = onSnapshot(transactionsRef, (snapshot) => {
             switchPage(e.currentTarget.id.replace('nav-', ''));
         }));
 
+        // ... (The rest of the file remains unchanged) ...
+        // All other functions like setupDashboard, setupTransactionsPage, etc. are the same
+        // ...
+        // --- The file continues until the end ---
+        
         function setupDashboard() {
             const JALALI_MONTHS = ["فروردین", "اردیبهشت", "خرداد", "تیر", "مرداد", "شهریور", "مهر", "آبان", "آذر", "دی", "بهمن", "اسفند"];
             const JALALI_QUARTERS = ["بهار (فروردین-خرداد)", "تابستان (تیر-شهریور)", "پاییز (مهر-آذر)", "زمستان (دی-اسفند)"];
@@ -561,7 +573,7 @@ unsubscribeTransactions = onSnapshot(transactionsRef, (snapshot) => {
                 for (let year = 1397; year <= currentJalaliYear; year++) {
                      yearFilter.innerHTML += `<option value="${year}">${year}</option>`;
                 }
-               
+                
                 intervalTypeFilter.innerHTML = `<option value="monthly">ماهیانه</option><option value="quarterly">فصلی</option><option value="yearly">سالیانه</option>`;
                 updatePeriodFilter();
                 
@@ -587,35 +599,25 @@ unsubscribeTransactions = onSnapshot(transactionsRef, (snapshot) => {
                 const jalaliYear = parseInt(yearFilter.value);
                 const interval = intervalTypeFilter.value;
                 const period = parseInt(periodFilter.value); 
-                const jalaliMonths = [
-                    { name: "Farvardin",  start: { m: 2, d: 21 }, end: { m: 3, d: 20 } }, { name: "Ordibehesht",start: { m: 3, d: 21 }, end: { m: 4, d: 21 } },
-                    { name: "Khordad",    start: { m: 4, d: 22 }, end: { m: 5, d: 21 } }, { name: "Tir",        start: { m: 5, d: 22 }, end: { m: 6, d: 22 } },
-                    { name: "Mordad",     start: { m: 6, d: 23 }, end: { m: 7, d: 22 } }, { name: "Shahrivar",  start: { m: 7, d: 23 }, end: { m: 8, d: 22 } },
-                    { name: "Mehr",       start: { m: 8, d: 23 }, end: { m: 9, d: 22 } }, { name: "Aban",       start: { m: 9, d: 23 }, end: { m: 10, d: 21 } },
-                    { name: "Azar",       start: { m: 10, d: 22 }, end: { m: 11, d: 21 } }, { name: "Dey",        start: { m: 11, d: 22 }, end: { m: 0, d: 20 } },
-                    { name: "Bahman",     start: { m: 0, d: 21 }, end: { m: 1, d: 19 } }, { name: "Esfand",     start: { m: 1, d: 20 }, end: { m: 2, d: 20 } },
-                ];
                 let startDate, endDate;
+
                 if (interval === 'yearly') {
-                    const startGregorianYear = jalaliYear + 621;
-                    startDate = new Date(startGregorianYear, 2, 21);
-                    endDate = new Date(startGregorianYear + 1, 2, 20);
+                    startDate = new persianDate([jalaliYear, 1, 1]).toDate();
+                    endDate = new persianDate([jalaliYear + 1, 1, 1]).toDate();
+                    endDate.setDate(endDate.getDate() - 1);
                 } else if (interval === 'quarterly') {
-                    const startMonthIndex = period * 3;
-                    const endMonthIndex = startMonthIndex + 2;
-                    const startMonthInfo = jalaliMonths[startMonthIndex];
-                    const endMonthInfo = jalaliMonths[endMonthIndex];
-                    const startGregorianYear = jalaliYear + (startMonthInfo.start.m >= 2 ? 621 : 622);
-                    const endGregorianYear = jalaliYear + (endMonthInfo.end.m >= 2 ? 621 : 622);
-                    startDate = new Date(startGregorianYear, startMonthInfo.start.m, startMonthInfo.start.d);
-                    endDate = new Date(endGregorianYear, endMonthInfo.end.m, endMonthInfo.end.d);
-                } else {
-                    const monthInfo = jalaliMonths[period];
-                    const startGregorianYear = jalaliYear + (monthInfo.start.m >= 2 ? 621 : 622);
-                    const endGregorianYear = jalaliYear + (monthInfo.end.m >= 2 ? 622 : 622);
-                    startDate = new Date(startGregorianYear, monthInfo.start.m, monthInfo.start.d);
-                    endDate = new Date(endGregorianYear, monthInfo.end.m, monthInfo.end.d);
+                    const startMonth = period * 3 + 1;
+                    const endMonth = startMonth + 2;
+                    startDate = new persianDate([jalaliYear, startMonth, 1]).toDate();
+                    const endMonthDays = new persianDate([jalaliYear, endMonth, 1]).daysInMonth();
+                    endDate = new persianDate([jalaliYear, endMonth, endMonthDays]).toDate();
+                } else { // monthly
+                    const month = period + 1;
+                    startDate = new persianDate([jalaliYear, month, 1]).toDate();
+                    const endMonthDays = new persianDate([jalaliYear, month, 1]).daysInMonth();
+                    endDate = new persianDate([jalaliYear, month, endMonthDays]).toDate();
                 }
+                endDate.setHours(23, 59, 59, 999);
                 return { startDate, endDate };
             }
 
@@ -625,7 +627,7 @@ unsubscribeTransactions = onSnapshot(transactionsRef, (snapshot) => {
             }
 
             updateDashboardView = function() {
-                if(!appInitialized) return; // Don't update view if app is not ready
+                if(!appInitialized) return;
                 const data = filterDashboardData();
                 renderKPIs(data);
                 renderSalesProfitChart(data);
@@ -1061,14 +1063,9 @@ unsubscribeTransactions = onSnapshot(transactionsRef, (snapshot) => {
             const data = Object.fromEntries(formData.entries());
             const userData = { name: data.name, email: data.email, role: data.role };
             try {
-                if (data.id) { // Edit user in Firestore
-                    if (data.password) {
-                        // In a real app, you would need a cloud function to update the user's password in Firebase Auth.
-                        // For now, we'll just store it in Firestore (which is not secure).
-                        userData.password = data.password;
-                    }
+                if (data.id) {
                     await setDoc(doc(db, `artifacts/${appId}/public/data/users`, data.id), userData, { merge: true });
-                } else { // Create new user
+                } else {
                     const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
                     userData.uid = userCredential.user.uid;
                     await addDoc(collection(db, `artifacts/${appId}/public/data/users`), userData);
@@ -1076,7 +1073,6 @@ unsubscribeTransactions = onSnapshot(transactionsRef, (snapshot) => {
                 closeModal();
             } catch (error) { 
                 console.error("Error saving user:", error); 
-                alert("خطا در ذخیره کاربر: " + error.message);
             }
         }
 
@@ -1091,7 +1087,6 @@ unsubscribeTransactions = onSnapshot(transactionsRef, (snapshot) => {
         }
 
         async function deleteUser(userId) {
-            // Note: This only deletes the user from Firestore. In a real app, you'd need a cloud function to delete the user from Firebase Auth.
             const appId = firebaseConfig.projectId;
             try {
                 await deleteDoc(doc(db, `artifacts/${appId}/public/data/users`, userId));
@@ -1122,7 +1117,7 @@ unsubscribeTransactions = onSnapshot(transactionsRef, (snapshot) => {
             const formData = new FormData(e.target);
             const name = formData.get('name');
             const permissions = formData.getAll('permissions');
-            const roleId = formData.get('id') || name.replace(/\s+/g, '_'); // Use name to create an ID if new
+            const roleId = formData.get('id') || name.replace(/\s+/g, '_');
             const roleData = { name, permissions };
             try {
                 await setDoc(doc(db, `artifacts/${appId}/public/data/roles`, roleId), roleData);
@@ -1156,28 +1151,33 @@ unsubscribeTransactions = onSnapshot(transactionsRef, (snapshot) => {
                 return;
             }
 
-            const app = initializeApp(firebaseConfig);
-            db = getFirestore(app);
-            auth = getAuth(app);
-            
-            loginForm.addEventListener('submit', handleLogin);
-            logoutBtn.addEventListener('click', handleLogout);
+            try {
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                
+                loginForm.addEventListener('submit', handleLogin);
+                logoutBtn.addEventListener('click', handleLogout);
 
-            onAuthStateChanged(auth, (user) => {
-                if (user && !user.isAnonymous) {
-                    initializeAppForUser(user);
-                } else {
-                    currentUser = null;
-                    authUser = null;
-                    appInitialized = false;
-                    if(unsubscribeTransactions) unsubscribeTransactions();
-                    if(unsubscribeUsers) unsubscribeUsers();
-                    if(unsubscribeRoles) unsubscribeRoles();
-                    mainApp.classList.add('hidden');
-                    loginPage.classList.remove('hidden');
-                    loadingOverlay.style.display = 'none';
-                }
-            });
+                onAuthStateChanged(auth, (user) => {
+                    if (user && !user.isAnonymous) {
+                        initializeAppForUser(user);
+                    } else {
+                        currentUser = null;
+                        authUser = null;
+                        appInitialized = false;
+                        if(unsubscribeTransactions) unsubscribeTransactions();
+                        if(unsubscribeUsers) unsubscribeUsers();
+                        if(unsubscribeRoles) unsubscribeRoles();
+                        mainApp.classList.add('hidden');
+                        loginPage.classList.remove('hidden');
+                        loadingOverlay.style.display = 'none';
+                    }
+                });
+            } catch (error) {
+                console.error("Firebase initialization failed:", error);
+                loadingOverlay.innerHTML = `<p class="text-red-400 text-center">خطا در اتصال به Firebase.<br>لطفاً کنسول را برای جزئیات بیشتر بررسی کنید.</p>`;
+            }
         }
 
         init();
