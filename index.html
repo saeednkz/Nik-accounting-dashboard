@@ -442,8 +442,16 @@
             unsubscribeTransactions = onSnapshot(transactionsRef, (snapshot) => {
                 ALL_TRANSACTIONS = snapshot.docs.map(doc => {
                     const data = doc.data();
-                   const dateObject = data.orderdate && data.orderdate.toDate ? data.orderdate.toDate() : new Date(data.orderdate);
-return { ...data, id: doc.id, orderdate: dateObject };
+                   // ...
+unsubscribeTransactions = onSnapshot(transactionsRef, (snapshot) => {
+    ALL_TRANSACTIONS = snapshot.docs.map(doc => {
+        const data = doc.data();
+        // This line handles both Timestamp and String dates
+        const dateObject = data.orderdate && data.orderdate.toDate ? data.orderdate.toDate() : new Date(data.orderdate);
+        return { ...data, id: doc.id, orderdate: dateObject };
+    });
+    processAllTransactionsForPools();
+// ...
                 });
                 processAllTransactionsForPools();
                 if(appInitialized) {
