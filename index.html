@@ -195,7 +195,9 @@
                             <input type="text" id="tx-start-date" placeholder="از تاریخ" class="persian-datepicker bg-slate-800/50 border border-slate-700 text-slate-300 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block w-full p-2.5">
                             <input type="text" id="tx-end-date" placeholder="تا تاریخ" class="persian-datepicker bg-slate-800/50 border border-slate-700 text-slate-300 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block w-full p-2.5">
                             <select id="tx-type-filter" class="bg-slate-800/50 border border-slate-700 text-slate-300 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block w-full p-2.5">
-                                <option value="">همه انواع</option><option value="buy">خرید از مشتری</option><option value="sell">فروش به مشتری</option>
+                                <option value="">همه انواع</option>
+                                <option value="sell">خرید از مشتری</option>
+                                <option value="buy">فروش به مشتری</option>
                             </select>
                         </div>
                     </div>
@@ -495,13 +497,14 @@
             const pool = currencyPools[t.currencie_slug];
             const logEntry = { date: t.orderdate, amount: t.currency_amount, orderid: t.orderid };
 
-            if (t.services_type === 'buy') {
+            // *** CORRECTED LOGIC BASED ON USER DEFINITION ***
+            if (t.services_type === 'sell') { // Customer sells to us (our 'buy')
                 const newTotalQty = pool.quantity + t.currency_amount;
                 pool.weightedAvgCost = newTotalQty > 0 ? ((pool.quantity * pool.weightedAvgCost) + (t.currency_amount * t.currency_price)) / newTotalQty : 0;
                 pool.quantity = newTotalQty;
                 logEntry.type = 'واریز';
                 logEntry.rate = t.currency_price;
-            } else {
+            } else { // Customer buys from us (our 'sell')
                 pool.quantity -= t.currency_amount;
                 logEntry.type = 'برداشت';
                 logEntry.rate = pool.weightedAvgCost;
@@ -638,8 +641,10 @@
                 const kpiGrid = document.getElementById('kpi-grid');
                 if (!kpiGrid) return;
                 kpiGrid.innerHTML = '';
-                const salesOrders = data.filter(d => d.services_type === 'sell');
-                const buyOrders = data.filter(d => d.services_type === 'buy');
+                // *** CORRECTED LOGIC ***
+                const salesOrders = data.filter(d => d.services_type === 'buy'); // Customer buys from us
+                const buyOrders = data.filter(d => d.services_type === 'sell'); // Customer sells to us
+                
                 const totalSalesVolume = salesOrders.reduce((sum, d) => sum + d.Total_Amount, 0);
                 const totalBuyVolume = buyOrders.reduce((sum, d) => sum + d.Total_Amount, 0);
                 const totalNetProfit = data.reduce((sum, d) => sum + d.NetProfit, 0);
@@ -647,11 +652,11 @@
                 const avgProfitPerOrder = data.length > 0 ? totalNetProfit / data.length : 0;
                 const networkFeeProfit = data.reduce((sum, d) => sum + (d.Network_Wage - d.ActualNetwork_Wage), 0);
                 const kpis = [
-                    { label: 'حجم کل فروش', value: `${formatCurrency(totalSalesVolume,0)}`, unit: 'تومان', icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v.01' },
-                    { label: 'حجم کل خرید', value: `${formatCurrency(totalBuyVolume,0)}`, unit: 'تومان', icon: 'M3 10h18M7 15h1m4 0h1m4 0h1m-1-5h1.5a2.5 2.5 0 0 0 0-5H18' },
+                    { label: 'حجم کل فروش به مشتری', value: `${formatCurrency(totalSalesVolume,0)}`, unit: 'تومان', icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v.01' },
+                    { label: 'حجم کل خرید از مشتری', value: `${formatCurrency(totalBuyVolume,0)}`, unit: 'تومان', icon: 'M3 10h18M7 15h1m4 0h1m4 0h1m-1-5h1.5a2.5 2.5 0 0 0 0-5H18' },
                     { label: 'سود خالص کل', value: `${formatCurrency(totalNetProfit,0)}`, unit: 'تومان', icon: 'M13 17h8m0 0V9m0 8l-8-8-4 4-6-6' },
-                    { label: 'تعداد سفارش‌های فروش', value: formatCurrency(salesOrders.length, 0), unit: 'عدد', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2Z' },
-                    { label: 'تعداد سفارش‌های خرید', value: formatCurrency(buyOrders.length, 0), unit: 'عدد', icon: 'M16 11V7a4 4 0 0 0-8 0v4M5 9h14l1 12H4L5 9z' },
+                    { label: 'تعداد فروش به مشتری', value: formatCurrency(salesOrders.length, 0), unit: 'عدد', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2Z' },
+                    { label: 'تعداد خرید از مشتری', value: formatCurrency(buyOrders.length, 0), unit: 'عدد', icon: 'M16 11V7a4 4 0 0 0-8 0v4M5 9h14l1 12H4L5 9z' },
                     { label: 'تعداد سفارش‌های VIP', value: formatCurrency(numVipOrders, 0), unit: 'عدد', icon: 'M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z' },
                     { label: 'میانگین سود هر سفارش', value: `${formatCurrency(avgProfitPerOrder,0)}`, unit: 'تومان', icon: 'M17 9V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2m2 4h10a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2Zm-3-9h2' },
                     { label: 'سود کارمزد شبکه', value: `${formatCurrency(networkFeeProfit,0)}`, unit: 'تومان', icon: 'M8.684 13.342C8.886 13.545 9 13.848 9 14.158V15.5a1.5 1.5 0 0 1-1.5 1.5h-1a1.5 1.5 0 0 1-1.5-1.5v-1.342c0-.31.114-.613.316-.816l8-8c.202-.202.505-.316.816-.316h1.342a1.5 1.5 0 0 1 1.5 1.5v1a1.5 1.5 0 0 1-1.5 1.5h-1.582c-.31 0-.613.114-.816.316l-8 8Z' },
@@ -676,7 +681,8 @@
                 data.forEach(t => {
                     const key = t.orderdate.toISOString().split('T')[0];
                     if (aggregatedData[key]) {
-                        if (t.services_type === 'sell') aggregatedData[key].sales += t.Total_Amount;
+                        // *** CORRECTED LOGIC ***
+                        if (t.services_type === 'buy') aggregatedData[key].sales += t.Total_Amount;
                         aggregatedData[key].profit += t.NetProfit;
                     }
                 });
@@ -790,7 +796,7 @@
                     <td class="px-4 py-4 font-mono text-xs text-slate-300">${String(t.orderid).includes('-') ? String(t.orderid).split('-')[1] : t.orderid}</td>
                     <td class="px-4 py-4 whitespace-nowrap">${formatDate(t.orderdate)}</td>
                     <td class="px-4 py-4"><div>${t.first_name || ''} ${t.last_name || ''}</div><div class="text-xs text-slate-500">${t.Mobile || ''}</div></td>
-                    <td class="px-4 py-4"><span class="px-2 py-1 rounded-full text-xs ${t.services_type === 'sell' ? 'bg-red-500/20 text-red-300' : 'bg-green-500/20 text-green-300'}">${t.services_type === 'sell' ? 'فروش' : 'خرید'}</span></td>
+                    <td class="px-4 py-4"><span class="px-2 py-1 rounded-full text-xs ${t.services_type === 'buy' ? 'bg-red-500/20 text-red-300' : 'bg-green-500/20 text-green-300'}">${t.services_type === 'buy' ? 'فروش به مشتری' : 'خرید از مشتری'}</span></td>
                     <td class="px-4 py-4 font-semibold text-white">${t.currencie_slug}</td>
                     <td class="px-4 py-4 font-mono">${formatCurrency(t.currency_amount, 6)}</td>
                     <td class="px-4 py-4 font-mono text-white">${formatCurrency(t.Total_Amount,0)}</td>
@@ -860,7 +866,7 @@
             const modalBody = document.getElementById('details-modal-body');
             document.getElementById('details-modal-title').textContent = 'جزئیات کامل تراکنش';
             const detailItem = (label, value, extraClass = '') => `<div class="py-2.5 grid grid-cols-3 gap-4 border-b border-slate-700/30"><dt class="text-sm text-slate-400">${label}</dt><dd class="col-span-2 text-sm text-white font-mono break-words ${extraClass}">${value}</dd></div>`;
-            modalBody.innerHTML = `<div class="grid grid-cols-1 md:grid-cols-2 gap-x-8"><div><h4 class="text-lg font-semibold text-cyan-400 mb-2">اطلاعات سفارش</h4><dl>${detailItem('ID سفارش', t.orderid)}${detailItem('تاریخ سفارش', new Date(t.orderdate).toLocaleString('fa-IR', { timeZone: 'Asia/Tehran' }))}${detailItem('اسلاگ سرویس', t.service_slug)}${detailItem('عنوان دسته', t.categories_title)}${detailItem('نوع سرویس', t.services_type === 'sell' ? 'فروش به مشتری' : 'خرید از مشتری')}${detailItem('کریپتو؟', t['Is Crypto?'] ? 'بله' : 'خیر')}${detailItem('کد تخفیف', t['Vouchers Code'] || '---')}${detailItem('توضیحات', `<p class="text-xs leading-relaxed font-sans">${t.description || '---'}</p>`)}</dl></div><div><h4 class="text-lg font-semibold text-cyan-400 mb-2">اطلاعات کاربر</h4><dl>${detailItem('ID کاربر', t.userid)}${detailItem('نام', `<span class="font-sans">${t.first_name}</span>`)}${detailItem('نام خانوادگی', `<span class="font-sans">${t.last_name}</span>`)}${detailItem('موبایل', t.Mobile)}${detailItem('ایمیل', t.Email)}</dl><h4 class="text-lg font-semibold text-cyan-400 mt-6 mb-2">آدرس‌ها و TXID</h4><dl>${detailItem('آدرس مبدا', t['Source Wallet Address'])}${detailItem('آدرس مقصد', t['Destination Wallet Address'])}${detailItem('TXID', t.Txid)}</dl></div></div><div class="mt-6"><h4 class="text-lg font-semibold text-cyan-400 mb-2">جزئیات مالی</h4><div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"><div class="glass-card p-4 rounded-lg">${detailItem('نام ارز', `<span class="font-sans">${t.currency}</span> (${t.currencie_slug})`)}</div><div class="glass-card p-4 rounded-lg">${detailItem('مقدار ارز', formatCurrency(t.currency_amount, 8))}</div><div class="glass-card p-4 rounded-lg">${detailItem('نرخ ارز', formatCurrency(t.currency_price,0))}</div><div class="glass-card p-4 rounded-lg">${detailItem('ارزش تتری', formatCurrency(t.crypto_total_usdt,0))}</div><div class="glass-card p-4 rounded-lg">${detailItem('کارمزد ثابت', formatCurrency(t.Fix_Wage,0))}</div><div class="glass-card p-4 rounded-lg">${detailItem('کارمزد VIP', formatCurrency(t.Vip_Amount,0))}</div><div class="glass-card p-4 rounded-lg">${detailItem('مبلغ ووچر', formatCurrency(t.Voucher_Amount,0))}</div><div class="glass-card p-4 rounded-lg">${detailItem('کارمزد شبکه (دریافتی)', formatCurrency(t.Network_Wage,0))}</div><div class="glass-card p-4 rounded-lg">${detailItem('کارمزد شبکه (واقعی)', formatCurrency(t.ActualNetwork_Wage,0))}</div><div class="glass-card p-4 rounded-lg bg-slate-900/50">${detailItem('قیمت تمام شده (فی واحد)', formatCurrency(t.Cost_Basis,0), 'text-amber-400')}</div><div class="glass-card p-4 rounded-lg bg-slate-900/50">${detailItem('مبلغ کل', formatCurrency(t.Total_Amount,0), 'text-cyan-400 font-bold')}</div><div class="glass-card p-4 rounded-lg bg-slate-900/50">${detailItem('سود/زیان خالص', formatCurrency(t.NetProfit,0), t.NetProfit >= 0 ? 'text-green-400 font-bold' : 'text-red-400 font-bold')}</div></div></div>`;
+            modalBody.innerHTML = `<div class="grid grid-cols-1 md:grid-cols-2 gap-x-8"><div><h4 class="text-lg font-semibold text-cyan-400 mb-2">اطلاعات سفارش</h4><dl>${detailItem('ID سفارش', t.orderid)}${detailItem('تاریخ سفارش', new Date(t.orderdate).toLocaleString('fa-IR', { timeZone: 'Asia/Tehran' }))}${detailItem('اسلاگ سرویس', t.service_slug)}${detailItem('عنوان دسته', t.categories_title)}${detailItem('نوع سرویس', t.services_type === 'buy' ? 'فروش به مشتری' : 'خرید از مشتری')}${detailItem('کریپتو؟', t['Is Crypto?'] ? 'بله' : 'خیر')}${detailItem('کد تخفیف', t['Vouchers Code'] || '---')}${detailItem('توضیحات', `<p class="text-xs leading-relaxed font-sans">${t.description || '---'}</p>`)}</dl></div><div><h4 class="text-lg font-semibold text-cyan-400 mb-2">اطلاعات کاربر</h4><dl>${detailItem('ID کاربر', t.userid)}${detailItem('نام', `<span class="font-sans">${t.first_name}</span>`)}${detailItem('نام خانوادگی', `<span class="font-sans">${t.last_name}</span>`)}${detailItem('موبایل', t.Mobile)}${detailItem('ایمیل', t.Email)}</dl><h4 class="text-lg font-semibold text-cyan-400 mt-6 mb-2">آدرس‌ها و TXID</h4><dl>${detailItem('آدرس مبدا', t['Source Wallet Address'])}${detailItem('آدرس مقصد', t['Destination Wallet Address'])}${detailItem('TXID', t.Txid)}</dl></div></div><div class="mt-6"><h4 class="text-lg font-semibold text-cyan-400 mb-2">جزئیات مالی</h4><div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"><div class="glass-card p-4 rounded-lg">${detailItem('نام ارز', `<span class="font-sans">${t.currency}</span> (${t.currencie_slug})`)}</div><div class="glass-card p-4 rounded-lg">${detailItem('مقدار ارز', formatCurrency(t.currency_amount, 8))}</div><div class="glass-card p-4 rounded-lg">${detailItem('نرخ ارز', formatCurrency(t.currency_price,0))}</div><div class="glass-card p-4 rounded-lg">${detailItem('ارزش تتری', formatCurrency(t.crypto_total_usdt,0))}</div><div class="glass-card p-4 rounded-lg">${detailItem('کارمزد ثابت', formatCurrency(t.Fix_Wage,0))}</div><div class="glass-card p-4 rounded-lg">${detailItem('کارمزد VIP', formatCurrency(t.Vip_Amount,0))}</div><div class="glass-card p-4 rounded-lg">${detailItem('مبلغ ووچر', formatCurrency(t.Voucher_Amount,0))}</div><div class="glass-card p-4 rounded-lg">${detailItem('کارمزد شبکه (دریافتی)', formatCurrency(t.Network_Wage,0))}</div><div class="glass-card p-4 rounded-lg">${detailItem('کارمزد شبکه (واقعی)', formatCurrency(t.ActualNetwork_Wage,0))}</div><div class="glass-card p-4 rounded-lg bg-slate-900/50">${detailItem('قیمت تمام شده (فی واحد)', formatCurrency(t.Cost_Basis,0), 'text-amber-400')}</div><div class="glass-card p-4 rounded-lg bg-slate-900/50">${detailItem('مبلغ کل', formatCurrency(t.Total_Amount,0), 'text-cyan-400 font-bold')}</div><div class="glass-card p-4 rounded-lg bg-slate-900/50">${detailItem('سود/زیان خالص', formatCurrency(t.NetProfit,0), t.NetProfit >= 0 ? 'text-green-400 font-bold' : 'text-red-400 font-bold')}</div></div></div>`;
             detailsModal.classList.remove('hidden');
         }
 
@@ -895,7 +901,9 @@
                     formHtml += `<input type="datetime-local" name="orderdate" id="form-orderdate" value="${value}" class="border border-slate-700 text-slate-300 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block w-full p-2.5 ${disabledClass}" ${disabled}>`;
                 } else if (field.type === 'select') {
                     formHtml += `<select name="${field.id}" id="form-${field.id}" class="border border-slate-700 text-slate-300 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block w-full p-2.5 ${disabledClass}" ${disabled}>`;
-                    field.options.forEach(opt => { formHtml += `<option value="${opt}" ${value === opt ? 'selected' : ''}>${opt}</option>`; });
+                    // *** CORRECTED LOGIC ***
+                    formHtml += `<option value="buy" ${value === 'buy' ? 'selected' : ''}>فروش به مشتری</option>`;
+                    formHtml += `<option value="sell" ${value === 'sell' ? 'selected' : ''}>خرید از مشتری</option>`;
                     formHtml += '</select>';
                 } else if (field.type === 'textarea') {
                     formHtml += `${fieldHtml('textarea')}</textarea>`;
@@ -937,8 +945,9 @@
             newTxData.crypto_total_usdt = newTxData.currency_amount * newTxData.currency_price;
 
             const pool = currencyPools[newTxData.currencie_slug] || { weightedAvgCost: 0 };
-            newTxData.Cost_Basis = newTxData.services_type === 'buy' ? newTxData.currency_price : (pool.weightedAvgCost > 0 ? pool.weightedAvgCost : newTxData.currency_price * 0.98);
-            newTxData.NetProfit = newTxData.services_type === 'buy' ? (newTxData.Vip_Amount || 0) + (newTxData.Fix_Wage || 0) + ((newTxData.Network_Wage || 0) - (newTxData.ActualNetwork_Wage || 0)) : newTxData.Total_Amount - ((newTxData.Cost_Basis * newTxData.currency_amount) + (newTxData.ActualNetwork_Wage || 0));
+            // *** CORRECTED LOGIC ***
+            newTxData.Cost_Basis = newTxData.services_type === 'sell' ? newTxData.currency_price : (pool.weightedAvgCost > 0 ? pool.weightedAvgCost : newTxData.currency_price * 0.98);
+            newTxData.NetProfit = newTxData.services_type === 'sell' ? (newTxData.Vip_Amount || 0) + (newTxData.Fix_Wage || 0) + ((newTxData.Network_Wage || 0) - (newTxData.ActualNetwork_Wage || 0)) : newTxData.Total_Amount - ((newTxData.Cost_Basis * newTxData.currency_amount) + (newTxData.ActualNetwork_Wage || 0));
 
             try {
                 if (txId) { // Edit Mode
@@ -1184,3 +1193,446 @@
     </script>
 </body>
 </html>
+```
+
+Most up-to-date Immersive Artifact for "final_combined_script_with_logging" is:
+
+```javascript
+// =================================================================
+// START: OAuth2 Library Code
+// =================================================================
+var OAuth2 = (function(global) {
+  'use strict';
+  var LIB_NAME = 'OAuth2';
+  var SERVICE_NAME_KEY = 'serviceName';
+  var ACCESS_TOKEN_KEY = 'accessToken';
+  var REFRESH_TOKEN_KEY = 'refreshToken';
+  var EXPIRATION_TIME_KEY = 'expirationTime';
+  var SCOPES_KEY = 'scopes';
+  var CALLBACK_FUNCTION_KEY = 'callbackFunction';
+  var PROPERTY_STORE_KEY = 'propertyStore';
+  var ADDITIONAL_PARAMS_KEY = 'additionalParams';
+  var STATE_TOKEN_KEY = 'stateToken';
+  var PKCE_TOKEN_SECRET_KEY = 'pkceTokenSecret';
+  var EXPIRATION_BUFFER_SECONDS = 60;
+  var LOCK_WAIT_TIME = 30 * 1000;
+  var MAX_LOCK_TRIES = 5;
+  var RETRY_WAIT_TIME = 1000;
+  var STATE_TOKEN_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  var PKCE_TOKEN_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
+
+  function createService(serviceName) {
+    if (!serviceName) {
+      throw new Error('Service name must be specified.');
+    }
+    return new Service(serviceName);
+  }
+
+  function Service(serviceName) {
+    this.serviceName_ = serviceName;
+    this.properties_ = PropertiesService.getScriptProperties();
+    this.propertyStore_ = new PropertiesStore(this.properties_, this.serviceName_);
+    this.tokenPayload_ = null;
+    this.lock_ = LockService.getScriptLock();
+  }
+
+  Service.prototype.getServiceName = function() {
+    return this.serviceName_;
+  };
+  Service.prototype.setTokenUrl = function(tokenUrl) {
+    this.tokenUrl_ = tokenUrl;
+    return this;
+  };
+  Service.prototype.setPrivateKey = function(privateKey) {
+    this.privateKey_ = privateKey;
+    return this;
+  };
+  Service.prototype.setIssuer = function(issuer) {
+    this.issuer_ = issuer;
+    return this;
+  };
+  Service.prototype.setSubject = function(subject) {
+    this.subject_ = subject;
+    return this;
+  };
+  Service.prototype.setPropertyStore = function(propertyStore) {
+    this.propertyStore_ = new PropertiesStore(propertyStore, this.serviceName_);
+    return this;
+  };
+  Service.prototype.setScope = function(scope) {
+    this.scope_ = scope;
+    return this;
+  };
+  Service.prototype.getAccessToken = function() {
+    this.lock_.waitLock(LOCK_WAIT_TIME);
+    try {
+      var accessToken = this.propertyStore_.getValue(ACCESS_TOKEN_KEY);
+      var expirationTime = this.propertyStore_.getValue(EXPIRATION_TIME_KEY);
+      if (accessToken && expirationTime && this.isExpired_(expirationTime)) {
+        // *** THIS IS THE CORRECTED LOGIC FOR SERVICE ACCOUNTS ***
+        this.exchange_(); 
+        accessToken = this.propertyStore_.getValue(ACCESS_TOKEN_KEY);
+      } else if (!accessToken) {
+        this.exchange_();
+        accessToken = this.propertyStore_.getValue(ACCESS_TOKEN_KEY);
+      }
+    } finally {
+      this.lock_.releaseLock();
+    }
+    return accessToken;
+  };
+  Service.prototype.exchange_ = function() {
+    var now = new Date().getTime();
+    var assertion = {
+      'iss': this.issuer_,
+      'sub': this.subject_,
+      'aud': this.tokenUrl_,
+      'exp': Math.floor(now / 1000) + 3600,
+      'iat': Math.floor(now / 1000)
+    };
+    if (this.scope_) {
+      assertion.scope = this.scope_;
+    }
+    var jwt = this.encodeJwt_(assertion, this.privateKey_);
+    var payload = {
+      'grant_type': 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+      'assertion': jwt
+    };
+    var response = this.fetchToken_(payload);
+    this.saveToken_(response);
+  };
+  Service.prototype.refresh = function() {
+    var refreshToken = this.propertyStore_.getValue(REFRESH_TOKEN_KEY);
+    if (!refreshToken) {
+      throw new Error('No refresh token is stored.');
+    }
+    var payload = {
+      'grant_type': 'refresh_token',
+      'refresh_token': refreshToken
+    };
+    var response = this.fetchToken_(payload);
+    this.saveToken_(response);
+  };
+  Service.prototype.fetchToken_ = function(payload) {
+    var response = UrlFetchApp.fetch(this.tokenUrl_, {
+      'method': 'post',
+      'payload': payload,
+      'muteHttpExceptions': true
+    });
+    var content = response.getContentText();
+    var token = JSON.parse(content);
+    if (token.error) {
+      throw new Error('Error fetching token: ' + token.error_description);
+    }
+    return token;
+  };
+  Service.prototype.saveToken_ = function(token) {
+    var accessToken = token.access_token;
+    var refreshToken = token.refresh_token;
+    var expiresIn = token.expires_in;
+    var expirationTime = new Date().getTime() + expiresIn * 1000;
+    this.propertyStore_.setValue(ACCESS_TOKEN_KEY, accessToken);
+    this.propertyStore_.setValue(EXPIRATION_TIME_KEY, expirationTime);
+    if (refreshToken) {
+      this.propertyStore_.setValue(REFRESH_TOKEN_KEY, refreshToken);
+    }
+  };
+  Service.prototype.isExpired_ = function(expirationTime) {
+    var now = new Date().getTime();
+    return expirationTime - now < EXPIRATION_BUFFER_SECONDS * 1000;
+  };
+  Service.prototype.encodeJwt_ = function(payload, privateKey) {
+    var header = {
+      'alg': 'RS256',
+      'typ': 'JWT'
+    };
+    var toSign = this.base64Encode_(JSON.stringify(header)) + '.' +
+      this.base64Encode_(JSON.stringify(payload));
+    var signature = Utilities.computeRsaSha256Signature(toSign, privateKey);
+    return toSign + '.' + this.base64Encode_(signature);
+  };
+  Service.prototype.base64Encode_ = function(str) {
+    var encoded = Utilities.base64Encode(str);
+    return encoded.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  };
+
+  function PropertiesStore(properties, serviceName) {
+    this.properties_ = properties;
+    this.serviceName_ = serviceName;
+  }
+  PropertiesStore.prototype.getValue = function(key) {
+    return this.properties_.getProperty(this.getPropertyKey_(key));
+  };
+  PropertiesStore.prototype.setValue = function(key, value) {
+    this.properties_.setProperty(this.getPropertyKey_(key), value);
+  };
+  PropertiesStore.prototype.getPropertyKey_ = function(key) {
+    return LIB_NAME + '.' + this.serviceName_ + '.' + key;
+  };
+
+  return {
+    createService: createService
+  };
+})(this);
+
+// =================================================================
+// START: Firestore Library Code
+// =================================================================
+var Firestore = (function(global) {
+  'use strict';
+
+  function getFirestore(email, key, projectId) {
+    return new Firestore_(email, key, projectId);
+  }
+
+  function getService(email, key) {
+    return OAuth2.createService('Firestore')
+      .setTokenUrl('https://accounts.google.com/o/oauth2/token')
+      .setPrivateKey(key)
+      .setIssuer(email)
+      .setSubject(email)
+      .setPropertyStore(PropertiesService.getScriptProperties())
+      .setScope('https://www.googleapis.com/auth/datastore');
+  }
+
+  class Firestore_ {
+    constructor(email, key, projectId) {
+      this.service = getService(email, key);
+      this.projectId = projectId;
+      this.base = 'https://firestore.googleapis.com/v1/projects/' + this.projectId + '/databases/(default)';
+    }
+    get token() {
+      return this.service.getAccessToken();
+    }
+    getDocument(path) {
+      const url = this.base + '/documents/' + path;
+      const response = UrlFetchApp.fetch(url, {
+        'headers': {
+          'Authorization': 'Bearer ' + this.token
+        },
+        'muteHttpExceptions': true
+      });
+      return new Document(response, this);
+    }
+    createDocument(path, fields, documentId) {
+      let url = this.base + '/documents/' + path;
+      if (documentId) {
+        url += '?documentId=' + documentId;
+      }
+      const response = UrlFetchApp.fetch(url, {
+        'method': 'post',
+        'contentType': 'application/json',
+        'headers': {
+          'Authorization': 'Bearer ' + this.token
+        },
+        'payload': JSON.stringify(formatFields(fields)),
+        'muteHttpExceptions': true
+      });
+      return new Document(response, this);
+    }
+  }
+
+  class Document {
+    constructor(response, firestore) {
+      const responseText = response.getContentText();
+      if (!responseText) {
+        this.exists = false;
+        this.error = { message: "Empty response from server." };
+        return;
+      }
+      const document = JSON.parse(responseText);
+      if (document.error) {
+        this.error = document.error;
+        this.exists = false;
+        return;
+      }
+      if (Object.keys(document).length == 0) {
+        this.exists = false;
+        return;
+      }
+      this.firestore = firestore;
+      this.name = document.name;
+      this.fields = document.fields ? parseFields(document.fields) : {};
+      this.createTime = document.createTime;
+      this.updateTime = document.updateTime;
+      this.exists = true;
+    }
+  }
+
+  function formatFields(fields) {
+    const newFields = {};
+    for (const i in fields) {
+      const field = fields[i];
+      let type = typeof field;
+      if (type == 'string') {
+        newFields[i] = { 'stringValue': field };
+      } else if (type == 'number') {
+        if (field % 1 === 0) {
+          newFields[i] = { 'integerValue': field };
+        } else {
+          newFields[i] = { 'doubleValue': field };
+        }
+      } else if (type == 'boolean') {
+        newFields[i] = { 'booleanValue': field };
+      } else if (type == 'object') {
+        if (field === null) {
+          newFields[i] = { 'nullValue': null };
+        } else if (Array.isArray(field)) {
+          newFields[i] = { 'arrayValue': { 'values': field.map(v => formatFields({v}).fields.v) } };
+        } else if (field instanceof Date) { // Correctly check for Date object
+          newFields[i] = { 'timestampValue': field.toISOString() };
+        } else {
+          newFields[i] = { 'mapValue': { 'fields': formatFields(field).fields } };
+        }
+      }
+    }
+    return { 'fields': newFields };
+  }
+
+  function parseFields(fields) {
+    const newFields = {};
+    for (const i in fields) {
+      const field = fields[i];
+      const type = Object.keys(field)[0];
+      let value = field[type];
+      if (type == 'integerValue') {
+        value = parseInt(value);
+      } else if (type == 'doubleValue') {
+        value = parseFloat(value);
+      } else if (type == 'mapValue') {
+        value = parseFields(value.fields);
+      } else if (type == 'arrayValue') {
+        if (!value.values) {
+          value = [];
+        } else {
+          value = value.values.map(function(v) {
+            const V = {};
+            const K = Object.keys(v)[0];
+            V[K] = v[K];
+            return parseFields({ 'v': V }).v;
+          });
+        }
+      } else if (type == 'timestampValue') {
+        value = new Date(value);
+      }
+      newFields[i] = value;
+    }
+    return newFields;
+  }
+
+  return {
+    getFirestore: getFirestore,
+    serverTimestamp: () => new Date(),
+    formatDate: (date) => date
+  };
+})(this);
+
+// =================================================================
+// START: Main Application Code
+// =================================================================
+
+// --- بخش تنظیمات ---
+const SERVICE_ACCOUNT_PRIVATE_KEY = "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDoLXGtGbbnXq16\n/uTHLJ79NgBWumLB/q+sBVNgTiXqVcYAzDaP/o5TLG3/PmFweK9xXvoed6weuQhQ\neKP+uCqOi1Q9Mln3l9DkR0GM1RHMi58Cnaw7TOIKx47Z7ILoVPAtLXSoW16GJqS4\nSZBXNkMn3HaxWb+LYH1hMS9jlInIgTzIKmLYN8wEW9EgNfGHz+4m1aqnE6+GiaOd\nrjP+s5j8exr8o/pcv95m/12MDj6s0V2HoQ3infuTWne89EJalu8igBb8u/o6vNWL\nQA4x1x/PnBo+qpMNyHC1zzKIYsop4C4lGxA6nJdl866ZKatLz+2CutDT7eu8v88g\nWTzrKZI9AgMBAAECggEAP/7Gpn+/+mYOSyiWxo92AzUvQrh9IBujMDcHlDP2H3Ek\n8nNXVrlDYYmNiB0ZnnalZQpYxq0VtCIsOIIIMd1xXXjp7zRBuA0QdtttJfRUw5x4\nZ7AuGOpII9B9f3PBYWiICuvMi9sjYrakEGe2cVNzjzklPh0OvswJwxBbj4cRs0Hl\nipfIskpJmo4TipHZP4XiW+Ry+P+HQLJZR/u3jgnFSjHLmTozVnGKD8bkfzc59o80\nzdJXO5kDdYIr1U/7tR5tFXO1kopLcn2ZOXCVd5i7ADxly2uAV7Z90PZ58/Iw1gsP\n8iEGVa/19PelnlZDNHKyPfZqRwcCeGW7auh38hUHwQKBgQD+RbpMNqziot44N08s\n0DkXOoNEZBtLaojg8rEex0uWH0z+GjzprdQORPdaW8Y2CVA30Kc7cGcZvdDpqpei\njj78N+QJzHRgR2VtdQ0wOoz8S5u/NWkD5TfxjMdCtjjBZ+WnjQFryih6q6arPsN+\nzDlarE4fcP/2nZyTtF3o1S9E+wKBgQDpwUkKeHVtu9rReX26uIItvjH9iiJWDDig\nSEgkuVCb3RRodmNCVQ8twwKCiQBAOUF/GJqEBST7ek3mn+ml2R/pHHuyZnmDxlEe\nSx55oHhb2WGLrS1wRmYEKBAr/RMQk8emJvBBBycURKbh76iW6zXiMMZebrPGa2+X\nsyA/h2UwJwKBgQDST139t6NbeRaQLL8h87+kxNLZ+GrS//TjChkRugl8y7rk2VLU\nfOBORSDJ7eqNuzpMUBpiAWBlXCi1fFIbM8hI2PmWWTNQhv0Pgac84tDFxMu3ZTfM\n7wRMmAIf3ZQn9AVxhiFMxFKi0+Lw9OLBt60goC+ltdMgadCeIqsh72I/jQKBgF2a\nQ2hI8iTd23KUJq+VYLN2fMgc/0DbpfUw3IqwFkJDlf96oKaYLvrRIvkoaQxOoRaG\nwKDq+nMk93rJQCNkPW34NOQsOq50xFjQFcT4aBnHg1MOJqrV1dYGQOuMbIzv0DuN\nThmMBq8MCpNgh27fgvUvOM/pnl1u+gGR/fDSg8dzAoGAQjDpU+jVLTS15zPaYJ5O\n8cHB/hiWWK7KzHcaLy+ZDE0iPscoHts12m0VKGeRdOlvhGDLjUgGANTMV4mU5Biz\nxfvOw1V4QIX7HAqzpvTSAdj2+FTT8RPYq50DoRW0Y5xN6uM8qggVpxRpKA0Vf2Ia\nnWiWNLH905z7nMRx0z2qsJk=\n-----END PRIVATE KEY-----\n";
+const SERVICE_ACCOUNT_EMAIL = "sheets-buy-importer@nik-accounting-app.iam.gserviceaccount.com";
+const FIREBASE_PROJECT_ID = "nik-accounting-app";
+
+const SHEET_NAME = "Sheet1";
+const FIRESTORE_COLLECTION_PATH = `artifacts/${FIREBASE_PROJECT_ID}/public/data/transactions`;
+
+const COLUMN_MAPPING = {
+  orderid: 1, orderdate: 2, userid: 3, first_name: 4, last_name: 5, Mobile: 6, Email: 7, service_slug: 8, categories_title: 9, services_type: 10, currency: 11, currencie_slug: 12, 'Source Wallet Address': 13, 'Destination Wallet Address': 14, Txid: 15, currency_amount: 16, 'Is Crypto?': 17, crypto_total_usdt: 18, currency_price: 19, 'Network Wage': 20, 'Fix Wage': 21, 'Vip Amount': 22, 'Voucher Amount': 23, 'Vouchers Code': 24, description: 25, ActualNetwork_Wage: 27
+};
+
+function onOpen() {
+  SpreadsheetApp.getUi().createMenu('Firebase Sync').addItem('Set Up Trigger', 'setupTrigger').addToUi();
+}
+
+function setupTrigger() {
+  const allTriggers = ScriptApp.getProjectTriggers();
+  for (const trigger of allTriggers) {
+    if (trigger.getHandlerFunction() === 'handleEdit') {
+      ScriptApp.deleteTrigger(trigger);
+    }
+  }
+  const sheet = SpreadsheetApp.getActiveSpreadsheet();
+  ScriptApp.newTrigger('handleEdit').forSpreadsheet(sheet).onEdit().create();
+  SpreadsheetApp.getUi().alert('Trigger created successfully!');
+}
+
+function handleEdit(e) {
+  const range = e.range;
+  const sheet = range.getSheet();
+  if (sheet.getName() === SHEET_NAME && range.getRow() > 1 && range.getNumRows() === 1) {
+    processRow(range.getRow());
+  }
+}
+
+function processRow(rowNum) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+  const range = sheet.getRange(rowNum, 1, 1, sheet.getLastColumn());
+  const values = range.getValues()[0];
+  const statusCell = sheet.getRange(rowNum, Object.keys(COLUMN_MAPPING).length + 2);
+
+  try {
+    // *** LOGIC CORRECTION: Look for 'sell' in Sheet (customer sells to company) ***
+    const transactionType = values[COLUMN_MAPPING.services_type - 1];
+    if (String(transactionType).toLowerCase() !== 'sell') {
+      Logger.log(`Skipping row ${rowNum} because it's not a 'sell' transaction.`);
+      return;
+    }
+
+    const orderId = values[COLUMN_MAPPING.orderid - 1];
+    if (!orderId) {
+      Logger.log(`Skipping row ${rowNum} due to empty Order ID.`);
+      return;
+    }
+
+    const firestore = Firestore.getFirestore(SERVICE_ACCOUNT_EMAIL, SERVICE_ACCOUNT_PRIVATE_KEY, FIREBASE_PROJECT_ID);
+    
+    let txData = {};
+    for (const key in COLUMN_MAPPING) {
+      const colIndex = COLUMN_MAPPING[key] - 1;
+      let value = values[colIndex];
+      const numericFields = ['userid', 'currency_amount', 'crypto_total_usdt', 'currency_price', 'Network Wage', 'Fix Wage', 'Vip Amount', 'Voucher Amount', 'ActualNetwork_Wage'];
+      if (numericFields.includes(key) && value !== '' && !isNaN(value)) {
+        value = parseFloat(value);
+      }
+      // *** THIS IS THE CORRECTED DATE HANDLING ***
+      if (key === 'orderdate' && value) {
+        value = new Date(value);
+      }
+      if (key === 'Is Crypto?' && typeof value === 'string') {
+        value = value.toLowerCase() === 'true';
+      }
+      txData[key] = value === '' ? null : value;
+    }
+
+    // *** LOGIC CORRECTION: Save as 'buy' in Firestore to match app logic (company buys from customer) ***
+    txData.services_type = 'buy';
+
+    txData.Cost_Basis = txData.currency_price || 0;
+    txData.Total_Amount = (txData.currency_amount * txData.currency_price) + (txData['Vip Amount'] || 0) + (txData['Fix Wage'] || 0) + (txData['Network Wage'] || 0) - (txData['Voucher Amount'] || 0);
+    txData.NetProfit = (txData['Vip Amount'] || 0) + (txData['Fix Wage'] || 0) + ((txData['Network Wage'] || 0) - (txData.ActualNetwork_Wage || 0));
+    txData.createdAt = Firestore.serverTimestamp();
+    txData.creatorId = SERVICE_ACCOUNT_EMAIL;
+    txData.editHistory = [];
+
+    const newDocument = firestore.createDocument(FIRESTORE_COLLECTION_PATH, txData, orderId);
+    
+    if (newDocument.error) {
+      Logger.log(`Firestore API returned an error for Order ID ${orderId}: ${newDocument.error.message}`);
+      statusCell.setValue(`API Error: ${newDocument.error.message}`);
+    } else if (newDocument.exists) {
+      Logger.log(`Successfully added transaction ID: ${orderId} to Firestore.`);
+      statusCell.setValue('Synced Successfully');
+    } else {
+      Logger.log(`Unknown issue for Order ID ${orderId}`);
+      statusCell.setValue('Unknown Error');
+    }
+
+  } catch (err) {
+    Logger.log(`A critical error occurred for Order ID ${values[COLUMN_MAPPING.orderid - 1]}: ${err.toString()}`);
+    Logger.log(err.stack);
+    statusCell.setValue(`Critical Error: ${err.message}`);
+  }
+}
