@@ -442,7 +442,8 @@
             unsubscribeTransactions = onSnapshot(transactionsRef, (snapshot) => {
                 ALL_TRANSACTIONS = snapshot.docs.map(doc => {
                     const data = doc.data();
-                    return { ...data, id: doc.id, orderdate: data.orderdate.toDate() };
+                   const dateObject = data.orderdate && data.orderdate.toDate ? data.orderdate.toDate() : new Date(data.orderdate);
+return { ...data, id: doc.id, orderdate: dateObject };
                 });
                 processAllTransactionsForPools();
                 if(appInitialized) {
