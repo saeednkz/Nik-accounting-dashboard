@@ -191,7 +191,7 @@
                     
                     <div class="glass-card p-4 rounded-xl mb-6">
                         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                            <input type="text" id="tx-search-input" placeholder="جستجو در ID سفارش، موبایل، ایمیل..." class="bg-slate-800/50 border border-slate-700 text-slate-300 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block w-full p-2.5">
+                            <input type="text" id="tx-search-input" placeholder="جستجو در تمام جزئیات..." class="bg-slate-800/50 border border-slate-700 text-slate-300 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block w-full p-2.5">
                             <input type="text" id="tx-start-date" placeholder="از تاریخ" class="persian-datepicker bg-slate-800/50 border border-slate-700 text-slate-300 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block w-full p-2.5">
                             <input type="text" id="tx-end-date" placeholder="تا تاریخ" class="persian-datepicker bg-slate-800/50 border border-slate-700 text-slate-300 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block w-full p-2.5">
                             <select id="tx-type-filter" class="bg-slate-800/50 border border-slate-700 text-slate-300 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block w-full p-2.5">
@@ -500,7 +500,6 @@
             const pool = currencyPools[t.currencie_slug];
             const logEntry = { date: t.orderdate, amount: t.currency_amount, orderid: t.orderid };
 
-            // *** CORRECTED LOGIC BASED ON USER DEFINITION ***
             if (t.services_type === 'sell') { // Customer sells to us (our 'buy')
                 const newTotalQty = pool.quantity + t.currency_amount;
                 pool.weightedAvgCost = newTotalQty > 0 ? ((pool.quantity * pool.weightedAvgCost) + (t.currency_amount * t.currency_price)) / newTotalQty : 0;
@@ -777,34 +776,11 @@
                 const date = t.orderdate.getTime();
                 const dateMatch = date >= startDateUnix && date < endDateUnix;
 
-                // --- MODIFICATION START ---
-                // Expand search to include all relevant fields
                 let searchMatch = searchTerm === '';
                 if (!searchMatch) {
-                    const searchableString = [
-                        t.orderid,
-                        t.userid,
-                        t.first_name,
-                        t.last_name,
-                        t.Mobile,
-                        t.Email,
-                        t.service_slug,
-                        t.categories_title,
-                        t.currency,
-                        t.currencie_slug,
-                        t['Source Wallet Address'],
-                        t['Destination Wallet Address'],
-                        t.Txid,
-                        t.currency_amount,
-                        t.currency_price,
-                        t.Total_Amount,
-                        t['Vouchers Code'],
-                        t.description,
-                        t.NetProfit
-                    ].join(' ').toLowerCase();
+                    const searchableString = Object.values(t).join(' ').toLowerCase();
                     searchMatch = searchableString.includes(searchTerm);
                 }
-                // --- MODIFICATION END ---
 
                 return searchMatch && typeMatch && dateMatch;
             });
@@ -915,8 +891,12 @@
 
             const networkWageDisplay = `${formatCurrency(networkWageCrypto, 6)} ${slug} <span class="text-slate-400 font-sans">(${formatCurrency(networkWageToman, 0)} تومان)</span>`;
             const actualNetworkWageDisplay = `${formatCurrency(actualNetworkWageCrypto, 6)} ${slug} <span class="text-slate-400 font-sans">(${formatCurrency(actualNetworkWageToman, 0)} تومان)</span>`;
+            
+            // --- MODIFICATION START ---
+            const usdtEquivalentDisplay = t.usdt_equivalent_at_creation ? `${formatCurrency(t.usdt_equivalent_at_creation, 2)} USDT` : 'محاسبه نشده';
+            // --- MODIFICATION END ---
 
-            modalBody.innerHTML = `<div class="grid grid-cols-1 md:grid-cols-2 gap-x-8"><div><h4 class="text-lg font-semibold text-cyan-400 mb-2">اطلاعات سفارش</h4><dl>${detailItem('ID سفارش', t.orderid)}${detailItem('تاریخ سفارش', new Date(t.orderdate).toLocaleString('fa-IR', { timeZone: 'Asia/Tehran' }))}${detailItem('اسلاگ سرویس', t.service_slug)}${detailItem('عنوان دسته', t.categories_title)}${detailItem('نوع سرویس', t.services_type === 'buy' ? 'فروش به مشتری' : 'خرید از مشتری')}${detailItem('کریپتو؟', t['Is Crypto?'] ? 'بله' : 'خیر')}${detailItem('کد تخفیف', t['Vouchers Code'] || '---')}${detailItem('توضیحات', `<p class="text-xs leading-relaxed font-sans">${t.description || '---'}</p>`)}</dl></div><div><h4 class="text-lg font-semibold text-cyan-400 mb-2">اطلاعات کاربر</h4><dl>${detailItem('ID کاربر', t.userid)}${detailItem('نام', `<span class="font-sans">${t.first_name}</span>`)}${detailItem('نام خانوادگی', `<span class="font-sans">${t.last_name}</span>`)}${detailItem('موبایل', t.Mobile)}${detailItem('ایمیل', t.Email)}</dl><h4 class="text-lg font-semibold text-cyan-400 mt-6 mb-2">آدرس‌ها و TXID</h4><dl>${detailItem('آدرس مبدا', t['Source Wallet Address'])}${detailItem('آدرس مقصد', t['Destination Wallet Address'])}${detailItem('TXID', t.Txid)}</dl></div></div><div class="mt-6"><h4 class="text-lg font-semibold text-cyan-400 mb-2">جزئیات مالی</h4><div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"><div class="glass-card p-4 rounded-lg">${detailItem('نام ارز', `<span class="font-sans">${t.currency}</span> (${t.currencie_slug})`)}</div><div class="glass-card p-4 rounded-lg">${detailItem('مقدار ارز', formatCurrency(t.currency_amount, 8))}</div><div class="glass-card p-4 rounded-lg">${detailItem('نرخ ارز', formatCurrency(t.currency_price,0))}</div><div class="glass-card p-4 rounded-lg">${detailItem('ارزش تتری', formatCurrency(t.crypto_total_usdt,0))}</div><div class="glass-card p-4 rounded-lg">${detailItem('کارمزد ثابت', formatCurrency(t.Fix_Wage,0))}</div><div class="glass-card p-4 rounded-lg">${detailItem('کارمزد VIP', formatCurrency(t.Vip_Amount,0))}</div><div class="glass-card p-4 rounded-lg">${detailItem('مبلغ ووچر', formatCurrency(t.Voucher_Amount,0))}</div><div class="glass-card p-4 rounded-lg">${detailItem('کارمزد شبکه (دریافتی)', networkWageDisplay)}</div><div class="glass-card p-4 rounded-lg">${detailItem('کارمزد شبکه (واقعی)', actualNetworkWageDisplay)}</div><div class="glass-card p-4 rounded-lg bg-slate-900/50">${detailItem('قیمت تمام شده (فی واحد)', formatCurrency(t.Cost_Basis,0), 'text-amber-400')}</div><div class="glass-card p-4 rounded-lg bg-slate-900/50">${detailItem('مبلغ کل', formatCurrency(t.Total_Amount,0), 'text-cyan-400 font-bold')}</div><div class="glass-card p-4 rounded-lg bg-slate-900/50">${detailItem('سود/زیان خالص', formatCurrency(t.NetProfit,0), t.NetProfit >= 0 ? 'text-green-400 font-bold' : 'text-red-400 font-bold')}</div></div></div>`;
+            modalBody.innerHTML = `<div class="grid grid-cols-1 md:grid-cols-2 gap-x-8"><div><h4 class="text-lg font-semibold text-cyan-400 mb-2">اطلاعات سفارش</h4><dl>${detailItem('ID سفارش', t.orderid)}${detailItem('تاریخ سفارش', new Date(t.orderdate).toLocaleString('fa-IR', { timeZone: 'Asia/Tehran' }))}${detailItem('اسلاگ سرویس', t.service_slug)}${detailItem('عنوان دسته', t.categories_title)}${detailItem('نوع سرویس', t.services_type === 'buy' ? 'فروش به مشتری' : 'خرید از مشتری')}${detailItem('کریپتو؟', t['Is Crypto?'] ? 'بله' : 'خیر')}${detailItem('کد تخفیف', t['Vouchers Code'] || '---')}${detailItem('توضیحات', `<p class="text-xs leading-relaxed font-sans">${t.description || '---'}</p>`)}</dl></div><div><h4 class="text-lg font-semibold text-cyan-400 mb-2">اطلاعات کاربر</h4><dl>${detailItem('ID کاربر', t.userid)}${detailItem('نام', `<span class="font-sans">${t.first_name}</span>`)}${detailItem('نام خانوادگی', `<span class="font-sans">${t.last_name}</span>`)}${detailItem('موبایل', t.Mobile)}${detailItem('ایمیل', t.Email)}</dl><h4 class="text-lg font-semibold text-cyan-400 mt-6 mb-2">آدرس‌ها و TXID</h4><dl>${detailItem('آدرس مبدا', t['Source Wallet Address'])}${detailItem('آدرس مقصد', t['Destination Wallet Address'])}${detailItem('TXID', t.Txid)}</dl></div></div><div class="mt-6"><h4 class="text-lg font-semibold text-cyan-400 mb-2">جزئیات مالی</h4><div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"><div class="glass-card p-4 rounded-lg">${detailItem('نام ارز', `<span class="font-sans">${t.currency}</span> (${t.currencie_slug})`)}</div><div class="glass-card p-4 rounded-lg">${detailItem('مقدار ارز', formatCurrency(t.currency_amount, 8))}</div><div class="glass-card p-4 rounded-lg">${detailItem('نرخ ارز', formatCurrency(t.currency_price,0))}</div><div class="glass-card p-4 rounded-lg">${detailItem('ارزش تومانی', formatCurrency(t.crypto_total_usdt,0))}</div><div class="glass-card p-4 rounded-lg">${detailItem('معادل تتری (نرخ استخر در زمان ثبت)', usdtEquivalentDisplay)}</div><div class="glass-card p-4 rounded-lg">${detailItem('کارمزد ثابت', formatCurrency(t.Fix_Wage,0))}</div><div class="glass-card p-4 rounded-lg">${detailItem('کارمزد VIP', formatCurrency(t.Vip_Amount,0))}</div><div class="glass-card p-4 rounded-lg">${detailItem('مبلغ ووچر', formatCurrency(t.Voucher_Amount,0))}</div><div class="glass-card p-4 rounded-lg">${detailItem('کارمزد شبکه (دریافتی)', networkWageDisplay)}</div><div class="glass-card p-4 rounded-lg">${detailItem('کارمزد شبکه (واقعی)', actualNetworkWageDisplay)}</div><div class="glass-card p-4 rounded-lg bg-slate-900/50">${detailItem('قیمت تمام شده (فی واحد)', formatCurrency(t.Cost_Basis,0), 'text-amber-400')}</div><div class="glass-card p-4 rounded-lg bg-slate-900/50">${detailItem('مبلغ کل', formatCurrency(t.Total_Amount,0), 'text-cyan-400 font-bold')}</div><div class="glass-card p-4 rounded-lg bg-slate-900/50">${detailItem('سود/زیان خالص', formatCurrency(t.NetProfit,0), t.NetProfit >= 0 ? 'text-green-400 font-bold' : 'text-red-400 font-bold')}</div></div></div>`;
             detailsModal.classList.remove('hidden');
         }
 
@@ -1077,6 +1057,16 @@
                         newTxData.Total_Amount = (newTxData.currency_amount * newTxData.currency_price) + (newTxData.Vip_Amount || 0) + (newTxData.Fix_Wage || 0) + networkWageToman - (newTxData.Voucher_Amount || 0);
                         newTxData.NetProfit = newTxData.Total_Amount - ((newTxData.Cost_Basis * newTxData.currency_amount) + actualNetworkWageToman);
                     }
+                    
+                    // --- MODIFICATION START ---
+                    // Calculate and add the USDT equivalent at creation time
+                    const usdtPoolCost = currencyPools['usdt']?.weightedAvgCost || 0;
+                    if (usdtPoolCost > 0) {
+                        newTxData.usdt_equivalent_at_creation = newTxData.crypto_total_usdt / usdtPoolCost;
+                    } else {
+                        newTxData.usdt_equivalent_at_creation = 0;
+                    }
+                    // --- MODIFICATION END ---
 
                     newTxData.editHistory = [];
                     newTxData.createdAt = serverTimestamp();
