@@ -544,11 +544,6 @@
             e.preventDefault();
             switchPage(e.currentTarget.id.replace('nav-', ''));
         }));
-
-        // ... (The rest of the file remains unchanged) ...
-        // All other functions like setupDashboard, setupTransactionsPage, etc. are the same
-        // ...
-        // --- The file continues until the end ---
         
         function setupDashboard() {
             const JALALI_MONTHS = ["فروردین", "اردیبهشت", "خرداد", "تیر", "مرداد", "شهریور", "مهر", "آبان", "آذر", "دی", "بهمن", "اسفند"];
@@ -641,7 +636,6 @@
                 const kpiGrid = document.getElementById('kpi-grid');
                 if (!kpiGrid) return;
                 kpiGrid.innerHTML = '';
-                // *** CORRECTED LOGIC ***
                 const salesOrders = data.filter(d => d.services_type === 'buy'); // Customer buys from us
                 const buyOrders = data.filter(d => d.services_type === 'sell'); // Customer sells to us
                 
@@ -650,7 +644,16 @@
                 const totalNetProfit = data.reduce((sum, d) => sum + d.NetProfit, 0);
                 const numVipOrders = data.filter(d => d.Vip_Amount > 0).length;
                 const avgProfitPerOrder = data.length > 0 ? totalNetProfit / data.length : 0;
-                const networkFeeProfit = data.reduce((sum, d) => sum + (d.Network_Wage - d.ActualNetwork_Wage), 0);
+                
+                // --- MODIFICATION START ---
+                // Calculate network fee profit based on the new logic
+                const networkFeeProfit = data.reduce((sum, d) => {
+                    const price = d.currency_price || 0;
+                    const profitPerTx = (d.Network_Wage - d.ActualNetwork_Wage) * price;
+                    return sum + (isNaN(profitPerTx) ? 0 : profitPerTx);
+                }, 0);
+                // --- MODIFICATION END ---
+
                 const kpis = [
                     { label: 'حجم کل فروش به مشتری', value: `${formatCurrency(totalSalesVolume,0)}`, unit: 'تومان', icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v.01' },
                     { label: 'حجم کل خرید از مشتری', value: `${formatCurrency(totalBuyVolume,0)}`, unit: 'تومان', icon: 'M3 10h18M7 15h1m4 0h1m4 0h1m-1-5h1.5a2.5 2.5 0 0 0 0-5H18' },
@@ -681,7 +684,6 @@
                 data.forEach(t => {
                     const key = t.orderdate.toISOString().split('T')[0];
                     if (aggregatedData[key]) {
-                        // *** CORRECTED LOGIC ***
                         if (t.services_type === 'buy') aggregatedData[key].sales += t.Total_Amount;
                         aggregatedData[key].profit += t.NetProfit;
                     }
@@ -705,7 +707,16 @@
             function renderProfitCompositionChart(data) {
                 const selectedPeriod = periodFilter.options[periodFilter.selectedIndex].text;
                 document.getElementById('profit-composition-chart-title').textContent = `ترکیب سود خالص - ${selectedPeriod}`;
-                const networkFeeProfit = data.reduce((sum, d) => sum + (d.Network_Wage - d.ActualNetwork_Wage), 0);
+                
+                // --- MODIFICATION START ---
+                // Calculate network fee profit based on the new logic
+                const networkFeeProfit = data.reduce((sum, d) => {
+                    const price = d.currency_price || 0;
+                    const profitPerTx = (d.Network_Wage - d.ActualNetwork_Wage) * price;
+                    return sum + (isNaN(profitPerTx) ? 0 : profitPerTx);
+                }, 0);
+                // --- MODIFICATION END ---
+                
                 const totalFixWage = data.reduce((sum, d) => sum + d.Fix_Wage, 0);
                 const totalVipAmount = data.reduce((sum, d) => sum + d.Vip_Amount, 0);
                 const totalNetProfit = data.reduce((sum, d) => sum + d.NetProfit, 0);
@@ -866,7 +877,22 @@
             const modalBody = document.getElementById('details-modal-body');
             document.getElementById('details-modal-title').textContent = 'جزئیات کامل تراکنش';
             const detailItem = (label, value, extraClass = '') => `<div class="py-2.5 grid grid-cols-3 gap-4 border-b border-slate-700/30"><dt class="text-sm text-slate-400">${label}</dt><dd class="col-span-2 text-sm text-white font-mono break-words ${extraClass}">${value}</dd></div>`;
-            modalBody.innerHTML = `<div class="grid grid-cols-1 md:grid-cols-2 gap-x-8"><div><h4 class="text-lg font-semibold text-cyan-400 mb-2">اطلاعات سفارش</h4><dl>${detailItem('ID سفارش', t.orderid)}${detailItem('تاریخ سفارش', new Date(t.orderdate).toLocaleString('fa-IR', { timeZone: 'Asia/Tehran' }))}${detailItem('اسلاگ سرویس', t.service_slug)}${detailItem('عنوان دسته', t.categories_title)}${detailItem('نوع سرویس', t.services_type === 'buy' ? 'فروش به مشتری' : 'خرید از مشتری')}${detailItem('کریپتو؟', t['Is Crypto?'] ? 'بله' : 'خیر')}${detailItem('کد تخفیف', t['Vouchers Code'] || '---')}${detailItem('توضیحات', `<p class="text-xs leading-relaxed font-sans">${t.description || '---'}</p>`)}</dl></div><div><h4 class="text-lg font-semibold text-cyan-400 mb-2">اطلاعات کاربر</h4><dl>${detailItem('ID کاربر', t.userid)}${detailItem('نام', `<span class="font-sans">${t.first_name}</span>`)}${detailItem('نام خانوادگی', `<span class="font-sans">${t.last_name}</span>`)}${detailItem('موبایل', t.Mobile)}${detailItem('ایمیل', t.Email)}</dl><h4 class="text-lg font-semibold text-cyan-400 mt-6 mb-2">آدرس‌ها و TXID</h4><dl>${detailItem('آدرس مبدا', t['Source Wallet Address'])}${detailItem('آدرس مقصد', t['Destination Wallet Address'])}${detailItem('TXID', t.Txid)}</dl></div></div><div class="mt-6"><h4 class="text-lg font-semibold text-cyan-400 mb-2">جزئیات مالی</h4><div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"><div class="glass-card p-4 rounded-lg">${detailItem('نام ارز', `<span class="font-sans">${t.currency}</span> (${t.currencie_slug})`)}</div><div class="glass-card p-4 rounded-lg">${detailItem('مقدار ارز', formatCurrency(t.currency_amount, 8))}</div><div class="glass-card p-4 rounded-lg">${detailItem('نرخ ارز', formatCurrency(t.currency_price,0))}</div><div class="glass-card p-4 rounded-lg">${detailItem('ارزش تتری', formatCurrency(t.crypto_total_usdt,0))}</div><div class="glass-card p-4 rounded-lg">${detailItem('کارمزد ثابت', formatCurrency(t.Fix_Wage,0))}</div><div class="glass-card p-4 rounded-lg">${detailItem('کارمزد VIP', formatCurrency(t.Vip_Amount,0))}</div><div class="glass-card p-4 rounded-lg">${detailItem('مبلغ ووچر', formatCurrency(t.Voucher_Amount,0))}</div><div class="glass-card p-4 rounded-lg">${detailItem('کارمزد شبکه (دریافتی)', formatCurrency(t.Network_Wage,0))}</div><div class="glass-card p-4 rounded-lg">${detailItem('کارمزد شبکه (واقعی)', formatCurrency(t.ActualNetwork_Wage,0))}</div><div class="glass-card p-4 rounded-lg bg-slate-900/50">${detailItem('قیمت تمام شده (فی واحد)', formatCurrency(t.Cost_Basis,0), 'text-amber-400')}</div><div class="glass-card p-4 rounded-lg bg-slate-900/50">${detailItem('مبلغ کل', formatCurrency(t.Total_Amount,0), 'text-cyan-400 font-bold')}</div><div class="glass-card p-4 rounded-lg bg-slate-900/50">${detailItem('سود/زیان خالص', formatCurrency(t.NetProfit,0), t.NetProfit >= 0 ? 'text-green-400 font-bold' : 'text-red-400 font-bold')}</div></div></div>`;
+            
+            // --- MODIFICATION START ---
+            // Calculate and format network fees to show both crypto and Toman values
+            const networkWageCrypto = t.Network_Wage || 0;
+            const actualNetworkWageCrypto = t.ActualNetwork_Wage || 0;
+            const price = t.currency_price || 0;
+            const slug = (t.currencie_slug || '').toUpperCase();
+
+            const networkWageToman = networkWageCrypto * price;
+            const actualNetworkWageToman = actualNetworkWageCrypto * price;
+
+            const networkWageDisplay = `${formatCurrency(networkWageCrypto, 6)} ${slug} <span class="text-slate-400 font-sans">(${formatCurrency(networkWageToman, 0)} تومان)</span>`;
+            const actualNetworkWageDisplay = `${formatCurrency(actualNetworkWageCrypto, 6)} ${slug} <span class="text-slate-400 font-sans">(${formatCurrency(actualNetworkWageToman, 0)} تومان)</span>`;
+            // --- MODIFICATION END ---
+
+            modalBody.innerHTML = `<div class="grid grid-cols-1 md:grid-cols-2 gap-x-8"><div><h4 class="text-lg font-semibold text-cyan-400 mb-2">اطلاعات سفارش</h4><dl>${detailItem('ID سفارش', t.orderid)}${detailItem('تاریخ سفارش', new Date(t.orderdate).toLocaleString('fa-IR', { timeZone: 'Asia/Tehran' }))}${detailItem('اسلاگ سرویس', t.service_slug)}${detailItem('عنوان دسته', t.categories_title)}${detailItem('نوع سرویس', t.services_type === 'buy' ? 'فروش به مشتری' : 'خرید از مشتری')}${detailItem('کریپتو؟', t['Is Crypto?'] ? 'بله' : 'خیر')}${detailItem('کد تخفیف', t['Vouchers Code'] || '---')}${detailItem('توضیحات', `<p class="text-xs leading-relaxed font-sans">${t.description || '---'}</p>`)}</dl></div><div><h4 class="text-lg font-semibold text-cyan-400 mb-2">اطلاعات کاربر</h4><dl>${detailItem('ID کاربر', t.userid)}${detailItem('نام', `<span class="font-sans">${t.first_name}</span>`)}${detailItem('نام خانوادگی', `<span class="font-sans">${t.last_name}</span>`)}${detailItem('موبایل', t.Mobile)}${detailItem('ایمیل', t.Email)}</dl><h4 class="text-lg font-semibold text-cyan-400 mt-6 mb-2">آدرس‌ها و TXID</h4><dl>${detailItem('آدرس مبدا', t['Source Wallet Address'])}${detailItem('آدرس مقصد', t['Destination Wallet Address'])}${detailItem('TXID', t.Txid)}</dl></div></div><div class="mt-6"><h4 class="text-lg font-semibold text-cyan-400 mb-2">جزئیات مالی</h4><div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"><div class="glass-card p-4 rounded-lg">${detailItem('نام ارز', `<span class="font-sans">${t.currency}</span> (${t.currencie_slug})`)}</div><div class="glass-card p-4 rounded-lg">${detailItem('مقدار ارز', formatCurrency(t.currency_amount, 8))}</div><div class="glass-card p-4 rounded-lg">${detailItem('نرخ ارز', formatCurrency(t.currency_price,0))}</div><div class="glass-card p-4 rounded-lg">${detailItem('ارزش تتری', formatCurrency(t.crypto_total_usdt,0))}</div><div class="glass-card p-4 rounded-lg">${detailItem('کارمزد ثابت', formatCurrency(t.Fix_Wage,0))}</div><div class="glass-card p-4 rounded-lg">${detailItem('کارمزد VIP', formatCurrency(t.Vip_Amount,0))}</div><div class="glass-card p-4 rounded-lg">${detailItem('مبلغ ووچر', formatCurrency(t.Voucher_Amount,0))}</div><div class="glass-card p-4 rounded-lg">${detailItem('کارمزد شبکه (دریافتی)', networkWageDisplay)}</div><div class="glass-card p-4 rounded-lg">${detailItem('کارمزد شبکه (واقعی)', actualNetworkWageDisplay)}</div><div class="glass-card p-4 rounded-lg bg-slate-900/50">${detailItem('قیمت تمام شده (فی واحد)', formatCurrency(t.Cost_Basis,0), 'text-amber-400')}</div><div class="glass-card p-4 rounded-lg bg-slate-900/50">${detailItem('مبلغ کل', formatCurrency(t.Total_Amount,0), 'text-cyan-400 font-bold')}</div><div class="glass-card p-4 rounded-lg bg-slate-900/50">${detailItem('سود/زیان خالص', formatCurrency(t.NetProfit,0), t.NetProfit >= 0 ? 'text-green-400 font-bold' : 'text-red-400 font-bold')}</div></div></div>`;
             detailsModal.classList.remove('hidden');
         }
 
@@ -887,7 +913,37 @@
             const title = document.getElementById('transaction-form-title');
             const isEdit = transaction !== null;
             title.textContent = isEdit ? `اصلاح تراکنش ${String(transaction.orderid).includes('-') ? String(transaction.orderid).split('-')[1] : transaction.orderid}` : 'افزودن تراکنش دستی';
-            const allFields = [ {id: 'orderid', label: 'ID سفارش', type: 'number'},{id: 'orderdate', label: 'تاریخ و زمان', type: 'text'}, {id: 'userid', label: 'ID کاربر', type: 'number'}, {id: 'first_name', label: 'نام', type: 'text'}, {id: 'last_name', label: 'نام خانوادگی', type: 'text'}, {id: 'Mobile', label: 'موبایل', type: 'text'}, {id: 'Email', label: 'ایمیل', type: 'text'}, {id: 'service_slug', label: 'اسلاگ سرویس', type: 'text'}, {id: 'categories_title', label: 'عنوان دسته', type: 'text'}, {id: 'services_type', label: 'نوع سرویس', type: 'select', options: ['buy', 'sell']}, {id: 'currency', label: 'نام ارز', type: 'text'}, {id: 'currencie_slug', label: 'اسلاگ ارز', type: 'text'}, {id: 'Source Wallet Address', label: 'آدرس مبدا', type: 'text'}, {id: 'Destination Wallet Address', label: 'آدرس مقصد', type: 'text'}, {id: 'Txid', label: 'Txid', type: 'text'}, {id: 'currency_amount', label: 'مقدار ارز', type: 'number', step: '0.00000001'}, {id: 'currency_price', label: 'نرخ ارز', type: 'number', step: '0.01', isFinancial: true}, {id: 'Network_Wage', label: 'کارمزد شبکه (دریافتی)', type: 'number', step: '0.01', isFinancial: true}, {id: 'ActualNetwork_Wage', label: 'کارمزد شبکه (واقعی)', type: 'number', step: '0.01', isFinancial: true}, {id: 'Fix_Wage', label: 'کارمزد ثابت', type: 'number', step: '0.01', isFinancial: true}, {id: 'Vip_Amount', label: 'مبلغ VIP', type: 'number', step: '0.01', isFinancial: true}, {id: 'Voucher_Amount', label: 'مبلغ ووچر', type: 'number', step: '0.01', isFinancial: true}, {id: 'Vouchers Code', label: 'کد ووچر', type: 'text'}, {id: 'description', label: 'توضیحات', type: 'textarea'}, ];
+            
+            // --- MODIFICATION START ---
+            // Update labels for network fees and change step for better precision
+            const allFields = [
+                {id: 'orderid', label: 'ID سفارش', type: 'number'},
+                {id: 'orderdate', label: 'تاریخ و زمان', type: 'text'}, 
+                {id: 'userid', label: 'ID کاربر', type: 'number'}, 
+                {id: 'first_name', label: 'نام', type: 'text'}, 
+                {id: 'last_name', label: 'نام خانوادگی', type: 'text'}, 
+                {id: 'Mobile', label: 'موبایل', type: 'text'}, 
+                {id: 'Email', label: 'ایمیل', type: 'text'}, 
+                {id: 'service_slug', label: 'اسلاگ سرویس', type: 'text'}, 
+                {id: 'categories_title', label: 'عنوان دسته', type: 'text'}, 
+                {id: 'services_type', label: 'نوع سرویس', type: 'select', options: ['buy', 'sell']}, 
+                {id: 'currency', label: 'نام ارز', type: 'text'}, 
+                {id: 'currencie_slug', label: 'اسلاگ ارز', type: 'text'}, 
+                {id: 'Source Wallet Address', label: 'آدرس مبدا', type: 'text'}, 
+                {id: 'Destination Wallet Address', label: 'آدرس مقصد', type: 'text'}, 
+                {id: 'Txid', label: 'Txid', type: 'text'}, 
+                {id: 'currency_amount', label: 'مقدار ارز', type: 'number', step: '0.00000001'}, 
+                {id: 'currency_price', label: 'نرخ ارز (تومان)', type: 'number', step: '0.01', isFinancial: true}, 
+                {id: 'Network_Wage', label: 'کارمزد شبکه (دریافتی) (واحد ارز)', type: 'number', step: '0.00000001', isFinancial: true}, 
+                {id: 'ActualNetwork_Wage', label: 'کارمزد شبکه (واقعی) (واحد ارز)', type: 'number', step: '0.00000001', isFinancial: true}, 
+                {id: 'Fix_Wage', label: 'کارمزد ثابت (تومان)', type: 'number', step: '0.01', isFinancial: true}, 
+                {id: 'Vip_Amount', label: 'مبلغ VIP (تومان)', type: 'number', step: '0.01', isFinancial: true}, 
+                {id: 'Voucher_Amount', label: 'مبلغ ووچر (تومان)', type: 'number', step: '0.01', isFinancial: true}, 
+                {id: 'Vouchers Code', label: 'کد ووچر', type: 'text'}, 
+                {id: 'description', label: 'توضیحات', type: 'textarea'},
+            ];
+            // --- MODIFICATION END ---
+
             let formHtml = `<input type="hidden" name="id" value="${isEdit ? transaction.id : ''}"><div class="grid grid-cols-1 md:grid-cols-3 gap-4">`;
             allFields.forEach(field => {
                 let value = isEdit ? transaction[field.id] : '';
@@ -901,7 +957,6 @@
                     formHtml += `<input type="datetime-local" name="orderdate" id="form-orderdate" value="${value}" class="border border-slate-700 text-slate-300 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block w-full p-2.5 ${disabledClass}" ${disabled}>`;
                 } else if (field.type === 'select') {
                     formHtml += `<select name="${field.id}" id="form-${field.id}" class="border border-slate-700 text-slate-300 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block w-full p-2.5 ${disabledClass}" ${disabled}>`;
-                    // *** CORRECTED LOGIC ***
                     formHtml += `<option value="buy" ${value === 'buy' ? 'selected' : ''}>فروش به مشتری</option>`;
                     formHtml += `<option value="sell" ${value === 'sell' ? 'selected' : ''}>خرید از مشتری</option>`;
                     formHtml += '</select>';
@@ -934,20 +989,45 @@
                 const value = data[key];
                 if (key === 'orderdate') {
                     newTxData[key] = Timestamp.fromDate(new Date(value));
-                } else if (!isNaN(parseFloat(value)) && !key.includes('Address') && !key.includes('id') && key !== 'Mobile') {
+                } else if (value !== '' && !isNaN(parseFloat(value)) && !key.includes('Address') && !key.includes('id') && key !== 'Mobile' && key !== 'Vouchers Code') {
                     newTxData[key] = parseFloat(value);
                 } else {
                     newTxData[key] = value;
                 }
             });
+            
             newTxData['Is Crypto?'] = true;
-            newTxData.Total_Amount = (newTxData.currency_amount * newTxData.currency_price) + (newTxData.Vip_Amount || 0) + (newTxData.Fix_Wage || 0) + (newTxData.Network_Wage || 0) - (newTxData.Voucher_Amount || 0);
+
+            // --- MODIFICATION START ---
+            // The values for Network_Wage and ActualNetwork_Wage from the form are in crypto units.
+            // Convert them to Toman using the transaction's price for calculations.
+            const networkWageToman = (newTxData.Network_Wage || 0) * newTxData.currency_price;
+            const actualNetworkWageToman = (newTxData.ActualNetwork_Wage || 0) * newTxData.currency_price;
+
+            // Recalculate Total_Amount using the Toman value of the network wage
+            newTxData.Total_Amount = (newTxData.currency_amount * newTxData.currency_price) +
+                (newTxData.Vip_Amount || 0) +
+                (newTxData.Fix_Wage || 0) +
+                networkWageToman - // Use the Toman value
+                (newTxData.Voucher_Amount || 0);
+
             newTxData.crypto_total_usdt = newTxData.currency_amount * newTxData.currency_price;
 
             const pool = currencyPools[newTxData.currencie_slug] || { weightedAvgCost: 0 };
-            // *** CORRECTED LOGIC ***
-            newTxData.Cost_Basis = newTxData.services_type === 'sell' ? newTxData.currency_price : (pool.weightedAvgCost > 0 ? pool.weightedAvgCost : newTxData.currency_price * 0.98);
-            newTxData.NetProfit = newTxData.services_type === 'sell' ? (newTxData.Vip_Amount || 0) + (newTxData.Fix_Wage || 0) + ((newTxData.Network_Wage || 0) - (newTxData.ActualNetwork_Wage || 0)) : newTxData.Total_Amount - ((newTxData.Cost_Basis * newTxData.currency_amount) + (newTxData.ActualNetwork_Wage || 0));
+            newTxData.Cost_Basis = newTxData.services_type === 'sell' ?
+                newTxData.currency_price :
+                (pool.weightedAvgCost > 0 ? pool.weightedAvgCost : newTxData.currency_price * 0.98);
+
+            // Recalculate NetProfit using Toman values for network fees
+            if (newTxData.services_type === 'sell') { // We buy from customer
+                newTxData.NetProfit = (newTxData.Vip_Amount || 0) +
+                    (newTxData.Fix_Wage || 0) +
+                    (networkWageToman - actualNetworkWageToman); // Use Toman values
+            } else { // We sell to customer
+                newTxData.NetProfit = newTxData.Total_Amount -
+                    ((newTxData.Cost_Basis * newTxData.currency_amount) + actualNetworkWageToman); // Use Toman value
+            }
+            // --- MODIFICATION END ---
 
             try {
                 if (txId) { // Edit Mode
