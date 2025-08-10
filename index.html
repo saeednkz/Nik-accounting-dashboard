@@ -642,9 +642,12 @@
                 const salesOrders = data.filter(d => d.services_type === 'buy'); // Customer buys from us
                 const buyOrders = data.filter(d => d.services_type === 'sell'); // Customer sells to us
                 
-                const totalSalesVolume = salesOrders.reduce((sum, d) => sum + d.Total_Amount, 0);
-                const totalBuyVolume = buyOrders.reduce((sum, d) => sum + d.Total_Amount, 0);
-                const totalNetProfit = data.reduce((sum, d) => sum + d.NetProfit, 0);
+                // --- MODIFICATION START ---
+                const totalSalesVolume = salesOrders.reduce((sum, d) => sum + (parseFloat(d.Total_Amount) || 0), 0);
+                const totalBuyVolume = buyOrders.reduce((sum, d) => sum + (parseFloat(d.Total_Amount) || 0), 0);
+                const totalNetProfit = data.reduce((sum, d) => sum + (parseFloat(d.NetProfit) || 0), 0);
+                // --- MODIFICATION END ---
+                
                 const numVipOrders = data.filter(d => d.Vip_Amount > 0).length;
                 const avgProfitPerOrder = data.length > 0 ? totalNetProfit / data.length : 0;
                 
@@ -714,9 +717,12 @@
                     return sum + (isNaN(profitPerTx) ? 0 : profitPerTx);
                 }, 0);
                 
-                const totalFixWage = data.reduce((sum, d) => sum + d.Fix_Wage, 0);
-                const totalVipAmount = data.reduce((sum, d) => sum + d.Vip_Amount, 0);
-                const totalNetProfit = data.reduce((sum, d) => sum + d.NetProfit, 0);
+                // --- MODIFICATION START ---
+                const totalFixWage = data.reduce((sum, d) => sum + (parseFloat(d.Fix_Wage) || 0), 0);
+                const totalVipAmount = data.reduce((sum, d) => sum + (parseFloat(d.Vip_Amount) || 0), 0);
+                const totalNetProfit = data.reduce((sum, d) => sum + (parseFloat(d.NetProfit) || 0), 0);
+                // --- MODIFICATION END ---
+
                 const marginProfit = totalNetProfit - networkFeeProfit - totalFixWage - totalVipAmount;
                 const chartData = [marginProfit, totalFixWage, totalVipAmount, networkFeeProfit].map(v => v > 0 ? v : 0);
                 const labels = ['سود مارجین', 'کارمزد ثابت', 'کارمزد VIP', 'سود کارمزد شبکه'];
@@ -895,11 +901,8 @@
             document.getElementById('details-modal-title').textContent = `تاریخچه تغییرات - ${String(t.orderid).includes('-') ? String(t.orderid).split('-')[1] : t.orderid}`;
             let historyHtml = '<div class="space-y-4">';
             t.editHistory.forEach((entry, index) => {
-                // --- MODIFICATION START ---
-                // Use the timestamp directly as it's now a JS Date object
                 const historyDate = entry.timestamp ? entry.timestamp.toLocaleString('fa-IR', { timeZone: 'Asia/Tehran' }) : 'تاریخ نامشخص';
                 historyHtml += `<div class="glass-card p-4 rounded-lg"><p class="text-sm text-slate-400 mb-2">تغییر شماره ${index + 1} در تاریخ ${historyDate}</p><p class="text-white mb-3"><span class="text-slate-400">توضیحات:</span> ${entry.reason}</p><div class="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs"><div class="text-slate-300"><span class="text-slate-500">فیلد</span></div><div class="text-red-400"><span class="text-slate-500">مقدار قبلی</span></div><div class="text-green-400"><span class="text-slate-500">مقدار جدید</span></div>${Object.keys(entry.changes).map(key => `<div class="font-mono">${key}</div><div class="font-mono text-red-400">${formatCurrency(entry.changes[key].old, 4)}</div><div class="font-mono text-green-400">${formatCurrency(entry.changes[key].new, 4)}</div>`).join('')}</div></div>`;
-                // --- MODIFICATION END ---
             });
             historyHtml += '</div>';
             modalBody.innerHTML = historyHtml;
@@ -1016,12 +1019,9 @@
                     });
                     delete changes.editHistory;
 
-                    // --- MODIFICATION START ---
-                    // Use Timestamp.now() instead of serverTimestamp()
                     const editHistoryEntry = { timestamp: Timestamp.now(), reason: data.edit_reason, changes: changes, editorId: currentUser.uid };
                     const currentHistory = originalTxData.editHistory || [];
                     updatedTxData.editHistory = [...currentHistory, editHistoryEntry];
-                    // --- MODIFICATION END ---
                     
                     await updateDoc(txRef, updatedTxData);
 
