@@ -439,24 +439,27 @@
                 ALL_TRANSACTIONS = snapshot.docs.map(doc => {
                     const data = doc.data();
                     
-                    // *** ROBUST DATE HANDLING ***
+                    // Convert orderdate to JS Date
                     let dateObject = null;
-                    if (data.orderdate) {
-                        if (typeof data.orderdate.toDate === 'function') {
-                            // It's a proper Firestore Timestamp
-                            dateObject = data.orderdate.toDate();
-                        } else {
-                            // Fallback for strings or other formats from Google Sheets
-                            dateObject = new Date(data.orderdate);
-                        }
+                    if (data.orderdate && typeof data.orderdate.toDate === 'function') {
+                        dateObject = data.orderdate.toDate();
+                    } else if (data.orderdate) {
+                        dateObject = new Date(data.orderdate);
                     }
-                    // Prevent crash on invalid dates
                     if (!dateObject || isNaN(dateObject)) {
                         console.error("Invalid date format for transaction ID:", doc.id, data);
-                        dateObject = new Date(); // Use current date as a safe fallback
+                        dateObject = new Date();
                     }
+                    
+                    // Convert timestamps in editHistory to JS Date
+                    const processedHistory = (data.editHistory || []).map(entry => {
+                        if (entry.timestamp && typeof entry.timestamp.toDate === 'function') {
+                            return { ...entry, timestamp: entry.timestamp.toDate() };
+                        }
+                        return entry;
+                    });
 
-                    return { ...data, id: doc.id, orderdate: dateObject };
+                    return { ...data, id: doc.id, orderdate: dateObject, editHistory: processedHistory };
                 });
                 processAllTransactionsForPools();
                 if(appInitialized) {
@@ -892,7 +895,11 @@
             document.getElementById('details-modal-title').textContent = `تاریخچه تغییرات - ${String(t.orderid).includes('-') ? String(t.orderid).split('-')[1] : t.orderid}`;
             let historyHtml = '<div class="space-y-4">';
             t.editHistory.forEach((entry, index) => {
-                historyHtml += `<div class="glass-card p-4 rounded-lg"><p class="text-sm text-slate-400 mb-2">تغییر شماره ${index + 1} در تاریخ ${new Date(entry.timestamp.seconds * 1000).toLocaleString('fa-IR', { timeZone: 'Asia/Tehran' })}</p><p class="text-white mb-3"><span class="text-slate-400">توضیحات:</span> ${entry.reason}</p><div class="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs"><div class="text-slate-300"><span class="text-slate-500">فیلد</span></div><div class="text-red-400"><span class="text-slate-500">مقدار قبلی</span></div><div class="text-green-400"><span class="text-slate-500">مقدار جدید</span></div>${Object.keys(entry.changes).map(key => `<div class="font-mono">${key}</div><div class="font-mono text-red-400">${formatCurrency(entry.changes[key].old, 4)}</div><div class="font-mono text-green-400">${formatCurrency(entry.changes[key].new, 4)}</div>`).join('')}</div></div>`;
+                // --- MODIFICATION START ---
+                // Use the timestamp directly as it's now a JS Date object
+                const historyDate = entry.timestamp ? entry.timestamp.toLocaleString('fa-IR', { timeZone: 'Asia/Tehran' }) : 'تاریخ نامشخص';
+                historyHtml += `<div class="glass-card p-4 rounded-lg"><p class="text-sm text-slate-400 mb-2">تغییر شماره ${index + 1} در تاریخ ${historyDate}</p><p class="text-white mb-3"><span class="text-slate-400">توضیحات:</span> ${entry.reason}</p><div class="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs"><div class="text-slate-300"><span class="text-slate-500">فیلد</span></div><div class="text-red-400"><span class="text-slate-500">مقدار قبلی</span></div><div class="text-green-400"><span class="text-slate-500">مقدار جدید</span></div>${Object.keys(entry.changes).map(key => `<div class="font-mono">${key}</div><div class="font-mono text-red-400">${formatCurrency(entry.changes[key].old, 4)}</div><div class="font-mono text-green-400">${formatCurrency(entry.changes[key].new, 4)}</div>`).join('')}</div></div>`;
+                // --- MODIFICATION END ---
             });
             historyHtml += '</div>';
             modalBody.innerHTML = historyHtml;
@@ -921,7 +928,7 @@
                 {id: 'Source Wallet Address', label: 'آدرس مبدا', type: 'text'}, 
                 {id: 'Destination Wallet Address', label: 'آدرس مقصد', type: 'text'}, 
                 {id: 'Txid', label: 'Txid', type: 'text'}, 
-                {id: 'currency_amount', label: 'مقدار ارز', type: 'number', step: '0.00000001'}, 
+                {id: 'currency_amount', label: 'مقدار ارز', type: 'number', step: '0.00000001', isFinancial: true}, 
                 {id: 'currency_price', label: 'نرخ ارز (تومان)', type: 'number', step: '0.01', isFinancial: true}, 
                 {id: 'Network_Wage', label: 'کارمزد شبکه (دریافتی) (واحد ارز)', type: 'number', step: '0.00000001', isFinancial: true}, 
                 {id: 'ActualNetwork_Wage', label: 'کارمزد شبکه (واقعی) (واحد ارز)', type: 'number', step: '0.00000001', isFinancial: true}, 
@@ -970,75 +977,83 @@
             const formData = new FormData(e.target);
             const data = Object.fromEntries(formData.entries());
             const txId = data.id;
-            
-            const newTxData = {};
-            Object.keys(data).forEach(key => {
-                if (key === 'id' || key === 'edit_reason') return;
-                const value = data[key];
-                if (key === 'orderdate') {
-                    newTxData[key] = Timestamp.fromDate(new Date(value));
-                } else if (value !== '' && !isNaN(parseFloat(value)) && !key.includes('Address') && !key.includes('id') && key !== 'Mobile' && key !== 'Vouchers Code') {
-                    newTxData[key] = parseFloat(value);
-                } else {
-                    newTxData[key] = value;
-                }
-            });
-            
-            newTxData['Is Crypto?'] = true;
-
-            // --- MODIFICATION START ---
-            const networkWageToman = (newTxData.Network_Wage || 0) * newTxData.currency_price;
-            const actualNetworkWageToman = (newTxData.ActualNetwork_Wage || 0) * newTxData.currency_price;
-
-            newTxData.crypto_total_usdt = newTxData.currency_amount * newTxData.currency_price;
-            const pool = currencyPools[newTxData.currencie_slug] || { weightedAvgCost: 0 };
-             newTxData.Cost_Basis = newTxData.services_type === 'sell' ?
-                newTxData.currency_price :
-                (pool.weightedAvgCost > 0 ? pool.weightedAvgCost : newTxData.currency_price * 0.98);
-
-            if (newTxData.services_type === 'sell') { // We buy from customer
-                // Total_Amount is what we pay the customer
-                newTxData.Total_Amount = (newTxData.currency_amount * newTxData.currency_price) -
-                    (newTxData.Fix_Wage || 0) -
-                    (newTxData.Vip_Amount || 0) -
-                    networkWageToman +
-                    (newTxData.Voucher_Amount || 0);
-
-                // NetProfit is the sum of all fees we collect, plus profit from network fees
-                newTxData.NetProfit = (newTxData.Fix_Wage || 0) +
-                    (newTxData.Vip_Amount || 0) +
-                    (networkWageToman - actualNetworkWageToman);
-
-            } else { // We sell to customer ('buy' type)
-                // Total_Amount is what the customer pays us
-                newTxData.Total_Amount = (newTxData.currency_amount * newTxData.currency_price) +
-                    (newTxData.Vip_Amount || 0) +
-                    (newTxData.Fix_Wage || 0) +
-                    networkWageToman -
-                    (newTxData.Voucher_Amount || 0);
-
-                // NetProfit is what we received minus our costs
-                newTxData.NetProfit = newTxData.Total_Amount -
-                    ((newTxData.Cost_Basis * newTxData.currency_amount) + actualNetworkWageToman);
-            }
-            // --- MODIFICATION END ---
 
             try {
-                if (txId) { // Edit Mode
+                if (txId) { // --- EDIT MODE ---
                     const txRef = doc(db, `artifacts/${appId}/public/data/transactions`, txId);
                     const originalTxDoc = await getDoc(txRef);
                     const originalTxData = originalTxDoc.data();
-                    const changes = {};
-                    Object.keys(newTxData).forEach(key => {
-                        if (originalTxData[key] !== newTxData[key]) {
-                            changes[key] = { old: originalTxData[key] || null, new: newTxData[key] };
+
+                    const updatedTxData = { ...originalTxData };
+
+                    Object.keys(data).forEach(key => {
+                        if (key === 'id' || key === 'edit_reason' || data[key] === undefined || data[key] === '') return;
+                        const value = data[key];
+                        if (!isNaN(parseFloat(value))) {
+                            updatedTxData[key] = parseFloat(value);
+                        } else {
+                            updatedTxData[key] = value;
                         }
                     });
-                    const editHistoryEntry = { timestamp: serverTimestamp(), reason: data.edit_reason, changes: changes, editorId: currentUser.uid };
+
+                    const networkWageToman = (updatedTxData.Network_Wage || 0) * updatedTxData.currency_price;
+                    const actualNetworkWageToman = (updatedTxData.ActualNetwork_Wage || 0) * updatedTxData.currency_price;
+                    updatedTxData.crypto_total_usdt = updatedTxData.currency_amount * updatedTxData.currency_price;
+
+                    if (updatedTxData.services_type === 'sell') {
+                        updatedTxData.Total_Amount = (updatedTxData.currency_amount * updatedTxData.currency_price) - (updatedTxData.Fix_Wage || 0) - (updatedTxData.Vip_Amount || 0) - networkWageToman + (updatedTxData.Voucher_Amount || 0);
+                        updatedTxData.NetProfit = (updatedTxData.Fix_Wage || 0) + (updatedTxData.Vip_Amount || 0) + (networkWageToman - actualNetworkWageToman);
+                    } else {
+                        updatedTxData.Total_Amount = (updatedTxData.currency_amount * updatedTxData.currency_price) + (updatedTxData.Vip_Amount || 0) + (updatedTxData.Fix_Wage || 0) + networkWageToman - (updatedTxData.Voucher_Amount || 0);
+                        updatedTxData.NetProfit = updatedTxData.Total_Amount - ((updatedTxData.Cost_Basis * updatedTxData.currency_amount) + actualNetworkWageToman);
+                    }
+                    
+                    const changes = {};
+                    Object.keys(updatedTxData).forEach(key => {
+                        if (originalTxData[key] !== updatedTxData[key]) {
+                             changes[key] = { old: originalTxData[key] || null, new: updatedTxData[key] };
+                        }
+                    });
+                    delete changes.editHistory;
+
+                    // --- MODIFICATION START ---
+                    // Use Timestamp.now() instead of serverTimestamp()
+                    const editHistoryEntry = { timestamp: Timestamp.now(), reason: data.edit_reason, changes: changes, editorId: currentUser.uid };
                     const currentHistory = originalTxData.editHistory || [];
-                    newTxData.editHistory = [...currentHistory, editHistoryEntry];
-                    await updateDoc(txRef, newTxData);
-                } else { // Add Mode
+                    updatedTxData.editHistory = [...currentHistory, editHistoryEntry];
+                    // --- MODIFICATION END ---
+                    
+                    await updateDoc(txRef, updatedTxData);
+
+                } else { // --- ADD MODE ---
+                    const newTxData = {};
+                    Object.keys(data).forEach(key => {
+                        if (key === 'id' || key === 'edit_reason') return;
+                        const value = data[key];
+                        if (key === 'orderdate') {
+                            newTxData[key] = Timestamp.fromDate(new Date(value));
+                        } else if (value !== '' && !isNaN(parseFloat(value)) && !key.includes('Address') && !key.includes('id') && key !== 'Mobile' && key !== 'Vouchers Code') {
+                            newTxData[key] = parseFloat(value);
+                        } else {
+                            newTxData[key] = value;
+                        }
+                    });
+                    newTxData['Is Crypto?'] = true;
+
+                    const networkWageToman = (newTxData.Network_Wage || 0) * newTxData.currency_price;
+                    const actualNetworkWageToman = (newTxData.ActualNetwork_Wage || 0) * newTxData.currency_price;
+                    newTxData.crypto_total_usdt = newTxData.currency_amount * newTxData.currency_price;
+                    const pool = currencyPools[newTxData.currencie_slug] || { weightedAvgCost: 0 };
+                    newTxData.Cost_Basis = newTxData.services_type === 'sell' ? newTxData.currency_price : (pool.weightedAvgCost > 0 ? pool.weightedAvgCost : newTxData.currency_price * 0.98);
+
+                    if (newTxData.services_type === 'sell') {
+                        newTxData.Total_Amount = (newTxData.currency_amount * newTxData.currency_price) - (newTxData.Fix_Wage || 0) - (newTxData.Vip_Amount || 0) - networkWageToman + (newTxData.Voucher_Amount || 0);
+                        newTxData.NetProfit = (newTxData.Fix_Wage || 0) + (newTxData.Vip_Amount || 0) + (networkWageToman - actualNetworkWageToman);
+                    } else {
+                        newTxData.Total_Amount = (newTxData.currency_amount * newTxData.currency_price) + (newTxData.Vip_Amount || 0) + (newTxData.Fix_Wage || 0) + networkWageToman - (newTxData.Voucher_Amount || 0);
+                        newTxData.NetProfit = newTxData.Total_Amount - ((newTxData.Cost_Basis * newTxData.currency_amount) + actualNetworkWageToman);
+                    }
+
                     newTxData.editHistory = [];
                     newTxData.createdAt = serverTimestamp();
                     newTxData.creatorId = currentUser.uid;
