@@ -642,18 +642,15 @@
                 const salesOrders = data.filter(d => d.services_type === 'buy'); // Customer buys from us
                 const buyOrders = data.filter(d => d.services_type === 'sell'); // Customer sells to us
                 
-                // --- MODIFICATION START ---
                 const totalSalesVolume = salesOrders.reduce((sum, d) => sum + (parseFloat(d.Total_Amount) || 0), 0);
                 const totalBuyVolume = buyOrders.reduce((sum, d) => sum + (parseFloat(d.Total_Amount) || 0), 0);
                 const totalNetProfit = data.reduce((sum, d) => sum + (parseFloat(d.NetProfit) || 0), 0);
-                // --- MODIFICATION END ---
-                
-                const numVipOrders = data.filter(d => d.Vip_Amount > 0).length;
+                const numVipOrders = data.filter(d => (parseFloat(d.Vip_Amount) || 0) > 0).length;
                 const avgProfitPerOrder = data.length > 0 ? totalNetProfit / data.length : 0;
                 
                 const networkFeeProfit = data.reduce((sum, d) => {
-                    const price = d.currency_price || 0;
-                    const profitPerTx = (d.Network_Wage - d.ActualNetwork_Wage) * price;
+                    const price = parseFloat(d.currency_price) || 0;
+                    const profitPerTx = ((parseFloat(d.Network_Wage) || 0) - (parseFloat(d.ActualNetwork_Wage) || 0)) * price;
                     return sum + (isNaN(profitPerTx) ? 0 : profitPerTx);
                 }, 0);
 
@@ -687,8 +684,8 @@
                 data.forEach(t => {
                     const key = t.orderdate.toISOString().split('T')[0];
                     if (aggregatedData[key]) {
-                        if (t.services_type === 'buy') aggregatedData[key].sales += t.Total_Amount;
-                        aggregatedData[key].profit += t.NetProfit;
+                        if (t.services_type === 'buy') aggregatedData[key].sales += (parseFloat(t.Total_Amount) || 0);
+                        aggregatedData[key].profit += (parseFloat(t.NetProfit) || 0);
                     }
                 });
                 const labels = Object.keys(aggregatedData);
@@ -712,16 +709,14 @@
                 document.getElementById('profit-composition-chart-title').textContent = `ترکیب سود خالص - ${selectedPeriod}`;
                 
                 const networkFeeProfit = data.reduce((sum, d) => {
-                    const price = d.currency_price || 0;
-                    const profitPerTx = (d.Network_Wage - d.ActualNetwork_Wage) * price;
+                    const price = parseFloat(d.currency_price) || 0;
+                    const profitPerTx = ((parseFloat(d.Network_Wage) || 0) - (parseFloat(d.ActualNetwork_Wage) || 0)) * price;
                     return sum + (isNaN(profitPerTx) ? 0 : profitPerTx);
                 }, 0);
                 
-                // --- MODIFICATION START ---
                 const totalFixWage = data.reduce((sum, d) => sum + (parseFloat(d.Fix_Wage) || 0), 0);
                 const totalVipAmount = data.reduce((sum, d) => sum + (parseFloat(d.Vip_Amount) || 0), 0);
                 const totalNetProfit = data.reduce((sum, d) => sum + (parseFloat(d.NetProfit) || 0), 0);
-                // --- MODIFICATION END ---
 
                 const marginProfit = totalNetProfit - networkFeeProfit - totalFixWage - totalVipAmount;
                 const chartData = [marginProfit, totalFixWage, totalVipAmount, networkFeeProfit].map(v => v > 0 ? v : 0);
@@ -778,10 +773,39 @@
             }
             const type = document.getElementById('tx-type-filter').value;
             return ALL_TRANSACTIONS.filter(t => {
-                const searchMatch = searchTerm === '' || String(t.orderid).toLowerCase().includes(searchTerm) || (t.Mobile && t.Mobile.includes(searchTerm)) || (t.Email && t.Email.toLowerCase().includes(searchTerm));
                 const typeMatch = type === '' || t.services_type === type;
                 const date = t.orderdate.getTime();
                 const dateMatch = date >= startDateUnix && date < endDateUnix;
+
+                // --- MODIFICATION START ---
+                // Expand search to include all relevant fields
+                let searchMatch = searchTerm === '';
+                if (!searchMatch) {
+                    const searchableString = [
+                        t.orderid,
+                        t.userid,
+                        t.first_name,
+                        t.last_name,
+                        t.Mobile,
+                        t.Email,
+                        t.service_slug,
+                        t.categories_title,
+                        t.currency,
+                        t.currencie_slug,
+                        t['Source Wallet Address'],
+                        t['Destination Wallet Address'],
+                        t.Txid,
+                        t.currency_amount,
+                        t.currency_price,
+                        t.Total_Amount,
+                        t['Vouchers Code'],
+                        t.description,
+                        t.NetProfit
+                    ].join(' ').toLowerCase();
+                    searchMatch = searchableString.includes(searchTerm);
+                }
+                // --- MODIFICATION END ---
+
                 return searchMatch && typeMatch && dateMatch;
             });
         }
@@ -1020,7 +1044,7 @@
                     delete changes.editHistory;
 
                     const editHistoryEntry = { timestamp: Timestamp.now(), reason: data.edit_reason, changes: changes, editorId: currentUser.uid };
-                    const currentHistory = originalTxData.editHistory || [];
+                    const currentHistory = originalTxData.editHistory ? originalTxData.editHistory.map(h => ({...h, timestamp: Timestamp.fromDate(new Date(h.timestamp))})) : [];
                     updatedTxData.editHistory = [...currentHistory, editHistoryEntry];
                     
                     await updateDoc(txRef, updatedTxData);
