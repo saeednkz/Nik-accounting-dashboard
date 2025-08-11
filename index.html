@@ -162,7 +162,7 @@
                             <select id="period-filter" class="bg-slate-800/50 border border-slate-700 text-slate-300 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block w-full p-2.5"></select>
                         </div>
                     </header>
-                    <div id="kpi-grid" class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-4 gap-4 mb-6"></div>
+                    <div id="kpi-grid" class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-5 gap-4 mb-6"></div>
                     <div class="grid grid-cols-1 lg:grid-cols-5 gap-6 flex-grow">
                         <div class="lg:col-span-3 glass-card p-6 rounded-2xl flex flex-col">
                             <h3 id="sales-profit-chart-title" class="text-lg font-semibold mb-4 text-slate-100">مقایسه فروش و سود</h3>
@@ -374,7 +374,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, where, getDocs, serverTimestamp, Timestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, where, getDocs, serverTimestamp, Timestamp, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyCnI4Pe7kI41sa6NpnVXIOStsTOpBh7JDg",
@@ -397,6 +397,7 @@
         
         let unsubscribeTransactions, unsubscribeUsers, unsubscribeRoles, unsubscribeSuppliers;
         let appInitialized = false;
+        let isProcessingPools = false; 
 
         // --- DOM Elements ---
         const loadingOverlay = document.getElementById('loading-overlay');
@@ -562,25 +563,30 @@
                 const kpiGrid = document.getElementById('kpi-grid');
                 if (!kpiGrid) return;
                 kpiGrid.innerHTML = '';
-                const salesOrders = data.filter(d => d.services_type === 'buy'); // Customer buys from us
-                const buyOrders = data.filter(d => d.services_type === 'sell'); // Customer sells to us
+
+                const settledData = data.filter(d => d.costBasisStatus !== 'pending');
+                const pendingTxCount = ALL_TRANSACTIONS.filter(d => d.costBasisStatus === 'pending').length;
+
+                const salesOrders = settledData.filter(d => d.services_type === 'buy');
+                const buyOrders = settledData.filter(d => d.services_type === 'sell');
                 
                 const totalSalesVolume = salesOrders.reduce((sum, d) => sum + (parseFloat(d.Total_Amount) || 0), 0);
                 const totalBuyVolume = buyOrders.reduce((sum, d) => sum + (parseFloat(d.Total_Amount) || 0), 0);
-                const totalNetProfit = data.reduce((sum, d) => sum + (parseFloat(d.NetProfit) || 0), 0);
-                const numVipOrders = data.filter(d => (parseFloat(d.Vip_Amount) || 0) > 0).length;
-                const avgProfitPerOrder = data.length > 0 ? totalNetProfit / data.length : 0;
+                const totalNetProfit = settledData.reduce((sum, d) => sum + (parseFloat(d.NetProfit) || 0), 0);
+                const numVipOrders = settledData.filter(d => (parseFloat(d.Vip_Amount) || 0) > 0).length;
+                const avgProfitPerOrder = settledData.length > 0 ? totalNetProfit / settledData.length : 0;
                 
-                const networkFeeProfit = data.reduce((sum, d) => {
+                const networkFeeProfit = settledData.reduce((sum, d) => {
                     const price = parseFloat(d.currency_price) || 0;
                     const profitPerTx = ((parseFloat(d.Network_Wage) || 0) - (parseFloat(d.ActualNetwork_Wage) || 0)) * price;
                     return sum + (isNaN(profitPerTx) ? 0 : profitPerTx);
                 }, 0);
 
                 const kpis = [
+                    { id: 'kpi-pending-tx', label: 'تراکنش‌های در انتظار تسویه', value: formatCurrency(pendingTxCount, 0), unit: 'عدد', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', clickable: true },
                     { label: 'حجم کل فروش به مشتری', value: `${formatCurrency(totalSalesVolume,0)}`, unit: 'تومان', icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v.01' },
                     { label: 'حجم کل خرید از مشتری', value: `${formatCurrency(totalBuyVolume,0)}`, unit: 'تومان', icon: 'M3 10h18M7 15h1m4 0h1m4 0h1m-1-5h1.5a2.5 2.5 0 0 0 0-5H18' },
-                    { label: 'سود خالص کل', value: `${formatCurrency(totalNetProfit,0)}`, unit: 'تومان', icon: 'M13 17h8m0 0V9m0 8l-8-8-4 4-6-6' },
+                    { label: 'سود خالص (نهایی شده)', value: `${formatCurrency(totalNetProfit,0)}`, unit: 'تومان', icon: 'M13 17h8m0 0V9m0 8l-8-8-4 4-6-6' },
                     { label: 'تعداد فروش به مشتری', value: formatCurrency(salesOrders.length, 0), unit: 'عدد', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2Z' },
                     { label: 'تعداد خرید از مشتری', value: formatCurrency(buyOrders.length, 0), unit: 'عدد', icon: 'M16 11V7a4 4 0 0 0-8 0v4M5 9h14l1 12H4L5 9z' },
                     { label: 'تعداد سفارش‌های VIP', value: formatCurrency(numVipOrders, 0), unit: 'عدد', icon: 'M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z' },
@@ -589,14 +595,21 @@
                 ];
                 kpis.forEach(kpi => {
                     const card = document.createElement('div');
-                    card.className = 'glass-card p-4 rounded-xl flex items-start gap-4 fade-in';
+                    card.className = `glass-card p-4 rounded-xl flex items-start gap-4 fade-in ${kpi.clickable ? 'cursor-pointer hover:bg-slate-800/50' : ''}`;
+                    if(kpi.id) card.id = kpi.id;
                     const unitHtml = kpi.unit ? `<span class="text-xs mr-1">${kpi.unit}</span>` : '';
-                    card.innerHTML = `<div class="bg-slate-800/60 h-10 w-10 shrink-0 flex items-center justify-center rounded-lg"><svg class="h-5 w-5 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="${kpi.icon}" /></svg></div><div><p class="text-sm text-slate-400 mb-1">${kpi.label}</p><p class="text-xl font-bold text-white flex items-baseline">${kpi.value} ${unitHtml}</p></div>`;
+                    card.innerHTML = `<div class="bg-slate-800/60 h-10 w-10 shrink-0 flex items-center justify-center rounded-lg"><svg class="h-5 w-5 ${kpi.id === 'kpi-pending-tx' ? 'text-amber-400' : 'text-cyan-400'}" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="${kpi.icon}" /></svg></div><div><p class="text-sm text-slate-400 mb-1">${kpi.label}</p><p class="text-xl font-bold text-white flex items-baseline">${kpi.value} ${unitHtml}</p></div>`;
                     kpiGrid.appendChild(card);
                 });
+                
+                const pendingTxCard = document.getElementById('kpi-pending-tx');
+                if (pendingTxCard) {
+                    pendingTxCard.addEventListener('click', showPendingTransactionsModal);
+                }
             }
             
             function renderSalesProfitChart(data) {
+                const settledData = data.filter(d => d.costBasisStatus !== 'pending');
                 const { startDate, endDate } = getSelectedDateRange();
                 const selectedPeriod = periodFilter.options[periodFilter.selectedIndex].text;
                 document.getElementById('sales-profit-chart-title').textContent = `مقایسه فروش و سود - ${selectedPeriod}`;
@@ -604,7 +617,7 @@
                 for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
                     aggregatedData[d.toISOString().split('T')[0]] = { sales: 0, profit: 0 };
                 }
-                data.forEach(t => {
+                settledData.forEach(t => {
                     const key = t.orderdate.toISOString().split('T')[0];
                     if (aggregatedData[key]) {
                         if (t.services_type === 'buy') aggregatedData[key].sales += (parseFloat(t.Total_Amount) || 0);
@@ -628,18 +641,19 @@
             }
             
             function renderProfitCompositionChart(data) {
+                const settledData = data.filter(d => d.costBasisStatus !== 'pending');
                 const selectedPeriod = periodFilter.options[periodFilter.selectedIndex].text;
                 document.getElementById('profit-composition-chart-title').textContent = `ترکیب سود خالص - ${selectedPeriod}`;
                 
-                const networkFeeProfit = data.reduce((sum, d) => {
+                const networkFeeProfit = settledData.reduce((sum, d) => {
                     const price = parseFloat(d.currency_price) || 0;
                     const profitPerTx = ((parseFloat(d.Network_Wage) || 0) - (parseFloat(d.ActualNetwork_Wage) || 0)) * price;
                     return sum + (isNaN(profitPerTx) ? 0 : profitPerTx);
                 }, 0);
                 
-                const totalFixWage = data.reduce((sum, d) => sum + (parseFloat(d.Fix_Wage) || 0), 0);
-                const totalVipAmount = data.reduce((sum, d) => sum + (parseFloat(d.Vip_Amount) || 0), 0);
-                const totalNetProfit = data.reduce((sum, d) => sum + (parseFloat(d.NetProfit) || 0), 0);
+                const totalFixWage = settledData.reduce((sum, d) => sum + (parseFloat(d.Fix_Wage) || 0), 0);
+                const totalVipAmount = settledData.reduce((sum, d) => sum + (parseFloat(d.Vip_Amount) || 0), 0);
+                const totalNetProfit = settledData.reduce((sum, d) => sum + (parseFloat(d.NetProfit) || 0), 0);
 
                 const marginProfit = totalNetProfit - networkFeeProfit - totalFixWage - totalVipAmount;
                 const chartData = [marginProfit, totalFixWage, totalVipAmount, networkFeeProfit].map(v => v > 0 ? v : 0);
@@ -739,12 +753,19 @@
 
                     return { ...data, id: doc.id, orderdate: dateObject, editHistory: processedHistory };
                 });
-                processAllTransactionsForPools();
-                if(appInitialized) {
-                    filterAndRenderTransactions();
-                    updateDashboardView();
-                    renderPoolsTable();
+                
+                if (isProcessingPools) {
+                    console.log("Pool processing is already running, skipping this update.");
+                    return;
                 }
+                
+                processAllTransactionsForPools().then(() => {
+                    if(appInitialized) {
+                        filterAndRenderTransactions();
+                        updateDashboardView();
+                        renderPoolsTable();
+                    }
+                });
             });
 
             if (unsubscribeUsers) unsubscribeUsers();
@@ -774,32 +795,96 @@
         }
         
         // --- DATA PROCESSING ---
-        function processAllTransactionsForPools() {
-            currencyPools = {};
-            const sortedTransactions = [...ALL_TRANSACTIONS].sort((a, b) => a.orderdate - b.orderdate);
-            sortedTransactions.forEach(t => processTransactionForPool(t));
-        }
+        async function processAllTransactionsForPools() {
+            if (isProcessingPools) return;
+            isProcessingPools = true;
 
-        function processTransactionForPool(t) {
-            if (!t.currencie_slug) return;
-            if (!currencyPools[t.currencie_slug]) {
-                currencyPools[t.currencie_slug] = { quantity: 0, weightedAvgCost: 0, log: [] };
-            }
-            const pool = currencyPools[t.currencie_slug];
-            const logEntry = { date: t.orderdate, amount: t.currency_amount, orderid: t.orderid };
+            const localTransactions = JSON.parse(JSON.stringify(ALL_TRANSACTIONS));
+            const sortedTransactions = localTransactions.sort((a, b) => new Date(a.orderdate) - new Date(b.orderdate));
+            
+            const updatesBatch = writeBatch(db);
+            let updatesNeeded = false;
+            
+            const newPools = {};
 
-            if (t.services_type === 'sell') { // Customer sells to us OR we buy from supplier
-                const newTotalQty = pool.quantity + t.currency_amount;
-                pool.weightedAvgCost = newTotalQty > 0 ? ((pool.quantity * pool.weightedAvgCost) + (t.currency_amount * t.currency_price)) / newTotalQty : 0;
-                pool.quantity = newTotalQty;
-                logEntry.type = 'واریز';
-                logEntry.rate = t.currency_price;
-            } else { // Customer buys from us
-                pool.quantity -= t.currency_amount;
-                logEntry.type = 'برداشت';
-                logEntry.rate = pool.weightedAvgCost;
+            for (const t of sortedTransactions) {
+                if (!t.currencie_slug) continue;
+                
+                if (!newPools[t.currencie_slug]) {
+                    newPools[t.currencie_slug] = { quantity: 0, weightedAvgCost: 0, log: [] };
+                }
+                const pool = newPools[t.currencie_slug];
+                const logEntry = { date: t.orderdate, amount: t.currency_amount, orderid: t.orderid };
+
+                if (t.services_type === 'buy') { // Selling to customer
+                    if (pool.quantity < t.currency_amount && t.costBasisStatus !== 'pending') {
+                        const txRef = doc(db, `artifacts/${firebaseConfig.projectId}/public/data/transactions`, t.id);
+                        updatesBatch.update(txRef, { costBasisStatus: 'pending', Cost_Basis: 0, NetProfit: 0 });
+                        updatesNeeded = true;
+                        t.costBasisStatus = 'pending';
+                    }
+                    
+                    pool.quantity -= t.currency_amount;
+                    logEntry.type = 'برداشت';
+                    logEntry.rate = t.Cost_Basis || pool.weightedAvgCost;
+                    pool.log.push(logEntry);
+
+                } else { // Buying from customer/supplier
+                    let remainingPurchaseQty = t.currency_amount;
+                    const purchasePrice = t.currency_price;
+                    
+                    const pendingSalesToSettle = sortedTransactions.filter(p => 
+                        p.currencie_slug === t.currencie_slug && 
+                        p.costBasisStatus === 'pending' && 
+                        new Date(p.orderdate) < new Date(t.orderdate)
+                    );
+
+                    for (const pendingSale of pendingSalesToSettle) {
+                        if (remainingPurchaseQty <= 0) break;
+                        
+                        // FIX: Add back the quantity of the sale we are now settling.
+                        pool.quantity += pendingSale.currency_amount;
+
+                        const txRef = doc(db, `artifacts/${firebaseConfig.projectId}/public/data/transactions`, pendingSale.id);
+                        const newCostBasis = purchasePrice;
+                        const actualNetworkWageToman = (pendingSale.ActualNetwork_Wage || 0) * pendingSale.currency_price;
+                        const newNetProfit = pendingSale.Total_Amount - ((newCostBasis * pendingSale.currency_amount) + actualNetworkWageToman);
+
+                        updatesBatch.update(txRef, {
+                            costBasisStatus: 'settled',
+                            Cost_Basis: newCostBasis,
+                            NetProfit: newNetProfit 
+                        });
+                        updatesNeeded = true;
+                        
+                        remainingPurchaseQty -= pendingSale.currency_amount;
+                        pendingSale.costBasisStatus = 'settled';
+                    }
+
+                    if (remainingPurchaseQty > 0) {
+                        const currentPoolValue = pool.quantity * pool.weightedAvgCost;
+                        const newPurchaseValue = remainingPurchaseQty * purchasePrice;
+                        
+                        const newTotalQuantity = pool.quantity + remainingPurchaseQty;
+                        const newTotalValue = currentPoolValue + newPurchaseValue;
+
+                        pool.weightedAvgCost = newTotalQuantity > 0 ? newTotalValue / newTotalQuantity : 0;
+                        pool.quantity = newTotalQuantity;
+                    }
+
+                    logEntry.type = 'واریز';
+                    logEntry.rate = purchasePrice;
+                    pool.log.push(logEntry);
+                }
             }
-            pool.log.push(logEntry);
+
+            if (updatesNeeded) {
+                console.log("Committing batch updates for settling transactions...");
+                await updatesBatch.commit().catch(err => console.error("Batch commit failed:", err));
+            }
+
+            currencyPools = newPools;
+            isProcessingPools = false;
         }
 
         // --- UI & PAGE LOGIC ---
@@ -858,7 +943,7 @@
             const type = document.getElementById('tx-type-filter').value;
             return ALL_TRANSACTIONS.filter(t => {
                 const typeMatch = type === '' || t.services_type === type;
-                const date = t.orderdate.getTime();
+                const date = new Date(t.orderdate).getTime();
                 const dateMatch = date >= startDateUnix && date < endDateUnix;
 
                 let searchMatch = searchTerm === '';
@@ -873,7 +958,7 @@
 
         function filterAndRenderTransactions() {
             if(!appInitialized) return;
-            filteredTransactions = getFilteredData().sort((a, b) => b.orderdate - a.orderdate);
+            filteredTransactions = getFilteredData().sort((a, b) => new Date(b.orderdate) - new Date(a.orderdate));
             renderTransactionsTable();
             renderPagination();
         }
@@ -888,7 +973,10 @@
                 return;
             }
             paginatedItems.forEach(t => {
-                const profitColor = t.NetProfit >= 0 ? 'text-green-400' : 'text-red-400';
+                const isPending = t.costBasisStatus === 'pending';
+                const profitColor = isPending ? 'text-amber-400' : (t.NetProfit >= 0 ? 'text-green-400' : 'text-red-400');
+                const profitText = isPending ? '<span class="text-xs">در انتظار تسویه</span>' : formatCurrency(t.NetProfit, 0);
+
                 const row = document.createElement('tr');
                 row.className = 'border-b border-slate-700/50 hover:bg-slate-800/40';
                 
@@ -907,13 +995,13 @@
 
                 row.innerHTML = `
                     <td class="px-4 py-4 font-mono text-xs text-slate-300">${String(t.orderid).includes('-') ? String(t.orderid).split('-')[1] : t.orderid}</td>
-                    <td class="px-4 py-4 whitespace-nowrap">${formatDate(t.orderdate)}</td>
+                    <td class="px-4 py-4 whitespace-nowrap">${formatDate(new Date(t.orderdate))}</td>
                     <td class="px-4 py-4"><div>${userOrSupplierName}</div><div class="text-xs text-slate-500">${userOrSupplierDetails}</div></td>
                     <td class="px-4 py-4"><span class="px-2 py-1 rounded-full text-xs ${typeColorClass}">${typeLabel}</span></td>
                     <td class="px-4 py-4 font-semibold text-white">${t.currencie_slug}</td>
                     <td class="px-4 py-4 font-mono">${formatCurrency(t.currency_amount, 6)}</td>
                     <td class="px-4 py-4 font-mono text-white">${formatCurrency(t.Total_Amount,0)}</td>
-                    <td class="px-4 py-4 font-mono ${profitColor}">${formatCurrency(t.NetProfit,0)}</td>
+                    <td class="px-4 py-4 font-mono ${profitColor}">${profitText}</td>
                     <td class="px-4 py-4 flex items-center gap-2">
                         <button class="details-btn text-slate-400 hover:text-cyan-400" title="جزئیات"><svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg></button>
                         <button class="edit-btn text-slate-400 hover:text-amber-400" title="اصلاح"><svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M5.433 13.917l1.262-3.155A4 4 0 017.58 9.42l6.92-6.918a2.121 2.121 0 013 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 01-.65-.65z" /><path d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0010 3H4.75A2.75 2.75 0 002 5.75v9.5A2.75 2.75 0 004.75 18h9.5A2.75 2.75 0 0017 15.25V10a.75.75 0 00-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5z" /></svg></button>
@@ -947,14 +1035,14 @@
 
         function exportToCSV() {
             const dataToExport = getFilteredData();
-            const headers = [ "orderid", "orderdate", "userid", "first_name", "last_name", "Mobile", "Email", "service_slug", "categories_title", "services_type", "currency", "currencie_slug", "Source Wallet Address", "Destination Wallet Address", "Txid", "currency_amount", "Is Crypto?", "crypto_total_usdt", "currency_price", "Cost_Basis", "Network Wage", "ActualNetwork Wage", "Fix Wage", "Total Amount", "Vip Amount", "Voucher Amount", "Vouchers Code", "description", "NetProfit" ];
+            const headers = [ "orderid", "orderdate", "userid", "first_name", "last_name", "Mobile", "Email", "service_slug", "categories_title", "services_type", "currency", "currencie_slug", "Source Wallet Address", "Destination Wallet Address", "Txid", "currency_amount", "Is Crypto?", "crypto_total_usdt", "currency_price", "Cost_Basis", "Network Wage", "ActualNetwork Wage", "Fix Wage", "Total Amount", "Vip Amount", "Voucher Amount", "Vouchers Code", "description", "NetProfit", "costBasisStatus" ];
             let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
             csvContent += headers.join(",") + "\r\n";
             dataToExport.forEach(row => {
                 const rowData = headers.map(header => {
                     let cell = row[header] === null || row[header] === undefined ? '' : row[header];
                     if (typeof cell === 'string' && cell.includes(',')) { cell = `"${cell}"`; }
-                    if(header === 'orderdate') { cell = new persianDate(row[header]).format('YYYY/MM/DD HH:mm:ss'); }
+                    if(header === 'orderdate') { cell = new persianDate(new Date(row[header])).format('YYYY/MM/DD HH:mm:ss'); }
                     return cell;
                 });
                 csvContent += rowData.join(",") + "\r\n";
@@ -976,6 +1064,43 @@
             transactionFormModal.classList.add('hidden');
         }
         
+        function showErrorModal(message) {
+            const modalTitle = document.getElementById('details-modal-title');
+            const modalBody = document.getElementById('details-modal-body');
+            modalTitle.textContent = 'خطا';
+            modalBody.innerHTML = `<p class="text-lg text-center text-red-400">${message}</p><div class="flex justify-center mt-6"><button id="close-error-modal-btn" class="bg-slate-600 hover:bg-slate-700 text-white font-bold py-2 px-6 rounded-lg">متوجه شدم</button></div>`;
+            document.getElementById('close-error-modal-btn').onclick = closeModal;
+            detailsModal.classList.remove('hidden');
+        }
+
+        function showPendingTransactionsModal() {
+            const modalTitle = document.getElementById('details-modal-title');
+            const modalBody = document.getElementById('details-modal-body');
+            modalTitle.textContent = 'تراکنش‌های در انتظار تسویه';
+            
+            const pendingTxs = ALL_TRANSACTIONS
+                .filter(t => t.costBasisStatus === 'pending')
+                .sort((a, b) => new Date(a.orderdate) - new Date(b.orderdate));
+
+            let tableHtml = `<div class="table-container overflow-y-auto max-h-[60vh]"><table class="w-full text-sm text-right text-slate-400"><thead class="text-xs text-slate-300 uppercase bg-slate-800/60 sticky top-0"><tr><th class="px-4 py-2">تاریخ</th><th class="px-4 py-2">کاربر</th><th class="px-4 py-2">ارز</th><th class="px-4 py-2">مقدار</th></tr></thead><tbody>`;
+
+            if (pendingTxs.length === 0) {
+                tableHtml += `<tr><td colspan="4" class="text-center py-8">هیچ تراکنش در انتظاری وجود ندارد.</td></tr>`;
+            } else {
+                pendingTxs.forEach(t => {
+                    tableHtml += `<tr class="border-b border-slate-700/50">
+                        <td class="px-4 py-3 whitespace-nowrap">${formatDateTime(new Date(t.orderdate))}</td>
+                        <td class="px-4 py-3">${t.first_name || ''} ${t.last_name || ''}</td>
+                        <td class="px-4 py-3 font-semibold text-white">${t.currencie_slug}</td>
+                        <td class="px-4 py-3 font-mono">${formatCurrency(t.currency_amount, 6)}</td>
+                    </tr>`;
+                });
+            }
+            tableHtml += '</tbody></table></div>';
+            modalBody.innerHTML = tableHtml;
+            detailsModal.classList.remove('hidden');
+        }
+
         function showDetailsModal(t) {
             const modalBody = document.getElementById('details-modal-body');
             document.getElementById('details-modal-title').textContent = 'جزئیات کامل تراکنش';
@@ -1012,7 +1137,7 @@
             document.getElementById('details-modal-title').textContent = `تاریخچه تغییرات - ${String(t.orderid).includes('-') ? String(t.orderid).split('-')[1] : t.orderid}`;
             let historyHtml = '<div class="space-y-4">';
             t.editHistory.forEach((entry, index) => {
-                const historyDate = entry.timestamp ? entry.timestamp.toLocaleString('fa-IR', { timeZone: 'Asia/Tehran' }) : 'تاریخ نامشخص';
+                const historyDate = entry.timestamp ? new Date(entry.timestamp).toLocaleString('fa-IR', { timeZone: 'Asia/Tehran' }) : 'تاریخ نامشخص';
                 historyHtml += `<div class="glass-card p-4 rounded-lg"><p class="text-sm text-slate-400 mb-2">تغییر شماره ${index + 1} در تاریخ ${historyDate}</p><p class="text-white mb-3"><span class="text-slate-400">توضیحات:</span> ${entry.reason}</p><div class="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs"><div class="text-slate-300"><span class="text-slate-500">فیلد</span></div><div class="text-red-400"><span class="text-slate-500">مقدار قبلی</span></div><div class="text-green-400"><span class="text-slate-500">مقدار جدید</span></div>${Object.keys(entry.changes).map(key => `<div class="font-mono">${key}</div><div class="font-mono text-red-400">${formatCurrency(entry.changes[key].old, 4)}</div><div class="font-mono text-green-400">${formatCurrency(entry.changes[key].new, 4)}</div>`).join('')}</div></div>`;
             });
             historyHtml += '</div>';
@@ -1056,7 +1181,7 @@
             let formHtml = `<input type="hidden" name="id" value="${isEdit ? transaction.id : ''}"><div class="grid grid-cols-1 md:grid-cols-3 gap-4">`;
             allFields.forEach(field => {
                 let value = isEdit ? transaction[field.id] : '';
-                if (isEdit && field.id === 'orderdate') { value = new Date(value).toISOString().slice(0, 16); }
+                if (isEdit && field.id === 'orderdate') { value = new Date(transaction.orderdate).toISOString().slice(0, 16); }
                 const disabled = isEdit && !field.isFinancial ? 'disabled' : '';
                 const disabledClass = isEdit && !field.isFinancial ? 'bg-slate-700/50 cursor-not-allowed' : 'bg-slate-800/50';
                 const fieldHtml = (type) => `<${type} name="${field.id}" id="form-${field.id}" ${type === 'textarea' ? '' : `value="${value}"`} ${disabled} ${field.step ? `step="${field.step}"` : ''} class="border border-slate-700 text-slate-300 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block w-full p-2.5 ${disabledClass}" ${type === 'textarea' ? 'rows="3"' : ''}>${type === 'textarea' ? value : ''}`;
@@ -1119,7 +1244,11 @@
                         updatedTxData.NetProfit = (updatedTxData.Fix_Wage || 0) + (updatedTxData.Vip_Amount || 0) + (networkWageToman - actualNetworkWageToman);
                     } else {
                         updatedTxData.Total_Amount = (updatedTxData.currency_amount * updatedTxData.currency_price) + (updatedTxData.Vip_Amount || 0) + (updatedTxData.Fix_Wage || 0) + networkWageToman - (updatedTxData.Voucher_Amount || 0);
-                        updatedTxData.NetProfit = updatedTxData.Total_Amount - ((updatedTxData.Cost_Basis * updatedTxData.currency_amount) + actualNetworkWageToman);
+                        if (updatedTxData.costBasisStatus !== 'pending') {
+                           updatedTxData.NetProfit = updatedTxData.Total_Amount - ((updatedTxData.Cost_Basis * updatedTxData.currency_amount) + actualNetworkWageToman);
+                        } else {
+                           updatedTxData.NetProfit = 0; // Keep profit 0 for pending
+                        }
                     }
                     
                     const changes = {};
@@ -1151,18 +1280,29 @@
                     });
                     newTxData['Is Crypto?'] = true;
 
+                    const pool = currencyPools[newTxData.currencie_slug] || { quantity: 0, weightedAvgCost: 0 };
+                    
+                    if (newTxData.services_type === 'buy' && pool.quantity < newTxData.currency_amount) {
+                        newTxData.costBasisStatus = 'pending';
+                        newTxData.Cost_Basis = 0;
+                        newTxData.NetProfit = 0; // Profit is unknown
+                    } else {
+                        newTxData.costBasisStatus = 'settled';
+                        newTxData.Cost_Basis = newTxData.services_type === 'sell' ? newTxData.currency_price : (pool.weightedAvgCost > 0 ? pool.weightedAvgCost : newTxData.currency_price * 0.98);
+                    }
+                    
                     const networkWageToman = (newTxData.Network_Wage || 0) * newTxData.currency_price;
                     const actualNetworkWageToman = (newTxData.ActualNetwork_Wage || 0) * newTxData.currency_price;
                     newTxData.crypto_total_usdt = newTxData.currency_amount * newTxData.currency_price;
-                    const pool = currencyPools[newTxData.currencie_slug] || { weightedAvgCost: 0 };
-                    newTxData.Cost_Basis = newTxData.services_type === 'sell' ? newTxData.currency_price : (pool.weightedAvgCost > 0 ? pool.weightedAvgCost : newTxData.currency_price * 0.98);
 
                     if (newTxData.services_type === 'sell') {
                         newTxData.Total_Amount = (newTxData.currency_amount * newTxData.currency_price) - (newTxData.Fix_Wage || 0) - (newTxData.Vip_Amount || 0) - networkWageToman + (newTxData.Voucher_Amount || 0);
                         newTxData.NetProfit = (newTxData.Fix_Wage || 0) + (newTxData.Vip_Amount || 0) + (networkWageToman - actualNetworkWageToman);
                     } else {
                         newTxData.Total_Amount = (newTxData.currency_amount * newTxData.currency_price) + (newTxData.Vip_Amount || 0) + (newTxData.Fix_Wage || 0) + networkWageToman - (newTxData.Voucher_Amount || 0);
-                        newTxData.NetProfit = newTxData.Total_Amount - ((newTxData.Cost_Basis * newTxData.currency_amount) + actualNetworkWageToman);
+                        if (newTxData.costBasisStatus === 'settled') {
+                           newTxData.NetProfit = newTxData.Total_Amount - ((newTxData.Cost_Basis * newTxData.currency_amount) + actualNetworkWageToman);
+                        }
                     }
                     
                     const usdtPoolCost = currencyPools['tether']?.weightedAvgCost || 0;
@@ -1180,6 +1320,7 @@
                 closeModal();
             } catch (error) {
                 console.error("Error saving transaction:", error);
+                showErrorModal(error.message);
             }
         }
 
@@ -1317,11 +1458,7 @@
             title.textContent = 'ثبت خرید جدید از تامین‌کننده';
 
             if (ALL_SUPPLIERS.length === 0) {
-                const modalBody = document.getElementById('details-modal-body');
-                document.getElementById('details-modal-title').textContent = 'خطا';
-                modalBody.innerHTML = `<p class="text-lg text-center text-white">ابتدا باید یک تامین‌کننده ثبت کنید.</p><div class="flex justify-center mt-6"><button id="cancel-purchase-btn" class="bg-slate-600 hover:bg-slate-700 text-white font-bold py-2 px-6 rounded-lg">متوجه شدم</button></div>`;
-                document.getElementById('cancel-purchase-btn').onclick = closeModal;
-                detailsModal.classList.remove('hidden');
+                showErrorModal('ابتدا باید یک تامین‌کننده ثبت کنید.');
                 return;
             }
             
@@ -1394,6 +1531,7 @@
                     transaction_source: 'supplier',
                     supplierId: data.supplierId,
                     services_type: 'sell',
+                    costBasisStatus: 'settled',
                     Cost_Basis: currencyPrice,
                     NetProfit: 0,
                     Fix_Wage: 0,
@@ -1410,6 +1548,7 @@
                 closeModal();
             } catch (error) {
                 console.error("Error saving purchase transaction:", error);
+                showErrorModal(error.message);
             }
         }
         
@@ -1420,7 +1559,7 @@
             
             const supplierPurchases = ALL_TRANSACTIONS
                 .filter(t => t.transaction_source === 'supplier' && t.supplierId === supplier.id)
-                .sort((a, b) => b.orderdate - a.orderdate);
+                .sort((a, b) => new Date(b.orderdate) - new Date(a.orderdate));
 
             let historyHtml = `<div class="table-container overflow-y-auto max-h-[60vh]"><table class="w-full text-sm text-right text-slate-400"><thead class="text-xs text-slate-300 uppercase bg-slate-800/60 sticky top-0"><tr><th class="px-4 py-2">تاریخ</th><th class="px-4 py-2">ارز</th><th class="px-4 py-2">مقدار</th><th class="px-4 py-2">نرخ خرید (تومان)</th><th class="px-4 py-2">مبلغ کل (تومان)</th><th class="px-4 py-2">TxID</th></tr></thead><tbody>`;
 
@@ -1429,7 +1568,7 @@
             } else {
                 supplierPurchases.forEach(t => {
                     historyHtml += `<tr class="border-b border-slate-700/50">
-                        <td class="px-4 py-3 whitespace-nowrap">${formatDateTime(t.orderdate)}</td>
+                        <td class="px-4 py-3 whitespace-nowrap">${formatDateTime(new Date(t.orderdate))}</td>
                         <td class="px-4 py-3 font-semibold text-white">${t.currencie_slug}</td>
                         <td class="px-4 py-3 font-mono">${formatCurrency(t.currency_amount, 6)}</td>
                         <td class="px-4 py-3 font-mono text-amber-400">${formatCurrency(t.currency_price, 0)}</td>
@@ -1499,7 +1638,7 @@
                     const supplierName = supplier ? supplier.name : 'نامشخص';
                     tableHtml += `<tr class="border-b border-slate-700/50">
                         <td class="px-4 py-3 font-semibold text-white">${supplierName}</td>
-                        <td class="px-4 py-3 whitespace-nowrap">${formatDate(t.orderdate)}</td>
+                        <td class="px-4 py-3 whitespace-nowrap">${formatDate(new Date(t.orderdate))}</td>
                         <td class="px-4 py-3 font-mono text-green-400 font-bold">${formatCurrency(t.currency_price, 0)}</td>
                         <td class="px-4 py-3 font-mono">${formatCurrency(t.currency_amount, 6)}</td>
                     </tr>`;
