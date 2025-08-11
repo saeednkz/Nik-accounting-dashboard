@@ -40,7 +40,7 @@
             border: 1px solid rgba(255, 255, 255, 0.1);
             box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
         }
-        select, input[type="text"], input[type="number"], textarea, input[type="password"], input[type="email"] {
+        select, input[type="text"], input[type="number"], textarea, input[type="password"], input[type="email"], input[type="datetime-local"] {
             -webkit-appearance: none;
             -moz-appearance: none;
             appearance: none;
@@ -817,6 +817,10 @@
             if (!(date instanceof Date) || isNaN(date)) return "تاریخ نامعتبر";
             return date.toLocaleDateString('fa-IR', { year: 'numeric', month: '2-digit', day: '2-digit' });
         }
+        const formatDateTime = (date) => {
+            if (!(date instanceof Date) || isNaN(date)) return "تاریخ نامعتبر";
+            return date.toLocaleString('fa-IR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+        }
         
         let updateDashboardView = () => {};
 
@@ -1330,8 +1334,8 @@
                         <select name="supplierId" id="purchase-supplier" required class="bg-slate-800/50 border border-slate-700 text-slate-300 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block w-full p-2.5">${supplierOptions}</select>
                     </div>
                     <div>
-                        <label for="purchase-date" class="block mb-2 text-sm font-medium text-slate-400">تاریخ خرید</label>
-                        <input type="text" id="purchase-date" name="orderdate" required class="persian-datepicker-modal bg-slate-800/50 border border-slate-700 text-slate-300 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block w-full p-2.5">
+                        <label for="purchase-date" class="block mb-2 text-sm font-medium text-slate-400">تاریخ و ساعت خرید</label>
+                        <input type="datetime-local" id="purchase-date" name="orderdate" required class="bg-slate-800/50 border border-slate-700 text-slate-300 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block w-full p-2.5">
                     </div>
                     <div>
                         <label for="purchase-slug" class="block mb-2 text-sm font-medium text-slate-400">اسلاگ ارز (مثلا tether)</label>
@@ -1360,12 +1364,6 @@
                 </div>
                 <button type="submit" class="w-full mt-6 text-white bg-emerald-600 hover:bg-emerald-700 focus:ring-4 focus:outline-none focus:ring-emerald-800 font-medium rounded-lg text-sm px-5 py-2.5 text-center">ثبت خرید</button>
             `;
-            // Initialize datepicker for the modal
-            $(".persian-datepicker-modal").persianDatepicker({
-                format: 'YYYY/MM/DD',
-                timeZone: 'Asia/Tehran',
-                initialValue: true
-            });
             form.onsubmit = handlePurchaseSubmit;
             transactionFormModal.classList.remove('hidden');
         }
@@ -1380,8 +1378,8 @@
             try {
                 const currencyAmount = parseFloat(data.currency_amount);
                 const currencyPrice = parseFloat(data.currency_price);
-                const datePicker = $('#purchase-date').data('datepicker');
-                const orderDate = datePicker ? Timestamp.fromMillis(datePicker.getState().selected.unixDate) : Timestamp.now();
+                const orderDateValue = data.orderdate;
+                const orderDate = orderDateValue ? Timestamp.fromDate(new Date(orderDateValue)) : Timestamp.now();
 
                 const newTxData = {
                     orderid: `SUP-${Date.now()}`,
@@ -1415,7 +1413,7 @@
             }
         }
         
-        // --- REPORTING FUNCTIONS (NEW) ---
+        // --- REPORTING FUNCTIONS ---
         function showSupplierHistoryModal(supplier) {
             const modalBody = document.getElementById('details-modal-body');
             document.getElementById('details-modal-title').textContent = `تاریخچه خرید از ${supplier.name}`;
@@ -1431,7 +1429,7 @@
             } else {
                 supplierPurchases.forEach(t => {
                     historyHtml += `<tr class="border-b border-slate-700/50">
-                        <td class="px-4 py-3 whitespace-nowrap">${formatDate(t.orderdate)}</td>
+                        <td class="px-4 py-3 whitespace-nowrap">${formatDateTime(t.orderdate)}</td>
                         <td class="px-4 py-3 font-semibold text-white">${t.currencie_slug}</td>
                         <td class="px-4 py-3 font-mono">${formatCurrency(t.currency_amount, 6)}</td>
                         <td class="px-4 py-3 font-mono text-amber-400">${formatCurrency(t.currency_price, 0)}</td>
