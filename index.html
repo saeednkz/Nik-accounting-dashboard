@@ -85,7 +85,7 @@
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
         </svg>
-        <p class="mt-4 text-slate-400">در حال بارگذاری و اتصال به سرور...</p>
+        <p id="loading-text" class="mt-4 text-slate-400">در حال بارگذاری و اتصال به سرور...</p>
     </div>
 
     <div id="login-page" class="hidden h-screen w-screen flex items-center justify-center p-4">
@@ -182,6 +182,11 @@
                     <header class="flex-shrink-0 flex flex-wrap items-center justify-between gap-4 mb-6">
                         <h2 class="text-3xl font-bold text-slate-100">مدیریت تراکنش‌ها</h2>
                         <div class="flex items-center gap-3">
+                            <input type="file" id="csv-file-input" class="hidden" accept=".csv">
+                            <button id="import-csv-btn" class="bg-indigo-500 text-white font-semibold px-5 py-2.5 rounded-lg flex items-center gap-2 hover:bg-indigo-400 transition-colors">
+                                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m.75 12l3 3m0 0l3-3m-3 3v-6m-1.5-9H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg>
+                                <span>ورود از فایل CSV</span>
+                            </button>
                             <button id="export-csv-btn" class="bg-emerald-500 text-slate-900 font-semibold px-5 py-2.5 rounded-lg flex items-center gap-2 hover:bg-emerald-400 transition-colors">
                                 <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
                                 <span>خروجی CSV</span>
@@ -401,6 +406,7 @@
 
         // --- DOM Elements ---
         const loadingOverlay = document.getElementById('loading-overlay');
+        const loadingText = document.getElementById('loading-text');
         const loginPage = document.getElementById('login-page');
         const mainApp = document.getElementById('main-app');
         const loginForm = document.getElementById('login-form');
@@ -690,6 +696,8 @@
             });
             document.getElementById('export-csv-btn').addEventListener('click', exportToCSV);
             document.getElementById('add-transaction-btn').addEventListener('click', () => openTransactionModal());
+            document.getElementById('import-csv-btn').addEventListener('click', () => document.getElementById('csv-file-input').click());
+            document.getElementById('csv-file-input').addEventListener('change', handleCsvFile);
             document.querySelectorAll('.close-modal-btn').forEach(btn => btn.addEventListener('click', closeModal));
             document.querySelectorAll('.modal').forEach(modal => modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); }));
         }
@@ -842,7 +850,6 @@
                     for (const pendingSale of pendingSalesToSettle) {
                         if (remainingPurchaseQty <= 0) break;
                         
-                        // FIX: Add back the quantity of the sale we are now settling.
                         pool.quantity += pendingSale.currency_amount;
 
                         const txRef = doc(db, `artifacts/${firebaseConfig.projectId}/public/data/transactions`, pendingSale.id);
@@ -1064,20 +1071,15 @@
             transactionFormModal.classList.add('hidden');
         }
         
-        function showErrorModal(message) {
+        function showModalMessage(title, bodyHtml) {
             const modalTitle = document.getElementById('details-modal-title');
             const modalBody = document.getElementById('details-modal-body');
-            modalTitle.textContent = 'خطا';
-            modalBody.innerHTML = `<p class="text-lg text-center text-red-400">${message}</p><div class="flex justify-center mt-6"><button id="close-error-modal-btn" class="bg-slate-600 hover:bg-slate-700 text-white font-bold py-2 px-6 rounded-lg">متوجه شدم</button></div>`;
-            document.getElementById('close-error-modal-btn').onclick = closeModal;
+            modalTitle.textContent = title;
+            modalBody.innerHTML = bodyHtml;
             detailsModal.classList.remove('hidden');
         }
 
         function showPendingTransactionsModal() {
-            const modalTitle = document.getElementById('details-modal-title');
-            const modalBody = document.getElementById('details-modal-body');
-            modalTitle.textContent = 'تراکنش‌های در انتظار تسویه';
-            
             const pendingTxs = ALL_TRANSACTIONS
                 .filter(t => t.costBasisStatus === 'pending')
                 .sort((a, b) => new Date(a.orderdate) - new Date(b.orderdate));
@@ -1097,13 +1099,10 @@
                 });
             }
             tableHtml += '</tbody></table></div>';
-            modalBody.innerHTML = tableHtml;
-            detailsModal.classList.remove('hidden');
+            showModalMessage('تراکنش‌های در انتظار تسویه', tableHtml);
         }
 
         function showDetailsModal(t) {
-            const modalBody = document.getElementById('details-modal-body');
-            document.getElementById('details-modal-title').textContent = 'جزئیات کامل تراکنش';
             const detailItem = (label, value, extraClass = '') => `<div class="py-2.5 grid grid-cols-3 gap-4 border-b border-slate-700/30"><dt class="text-sm text-slate-400">${label}</dt><dd class="col-span-2 text-sm text-white font-mono break-words ${extraClass}">${value}</dd></div>`;
             
             const networkWageCrypto = t.Network_Wage || 0;
@@ -1128,21 +1127,18 @@
                 userInfoHtml = `<h4 class="text-lg font-semibold text-cyan-400 mb-2">اطلاعات کاربر</h4><dl>${detailItem('ID کاربر', t.userid)}${detailItem('نام', `<span class="font-sans">${t.first_name}</span>`)}${detailItem('نام خانوادگی', `<span class="font-sans">${t.last_name}</span>`)}${detailItem('موبایل', t.Mobile)}${detailItem('ایمیل', t.Email)}</dl>`;
             }
 
-            modalBody.innerHTML = `<div class="grid grid-cols-1 md:grid-cols-2 gap-x-8"><div><h4 class="text-lg font-semibold text-cyan-400 mb-2">اطلاعات سفارش</h4><dl>${detailItem('ID سفارش', t.orderid)}${detailItem('تاریخ سفارش', new Date(t.orderdate).toLocaleString('fa-IR', { timeZone: 'Asia/Tehran' }))}${detailItem('اسلاگ سرویس', t.service_slug)}${detailItem('عنوان دسته', t.categories_title)}${detailItem('نوع سرویس', t.services_type === 'buy' ? 'فروش به مشتری' : 'خرید از مشتری')}${detailItem('کریپتو؟', t['Is Crypto?'] ? 'بله' : 'خیر')}${detailItem('کد تخفیف', t['Vouchers Code'] || '---')}${detailItem('توضیحات', `<p class="text-xs leading-relaxed font-sans">${t.description || '---'}</p>`)}</dl></div><div>${userInfoHtml}<h4 class="text-lg font-semibold text-cyan-400 mt-6 mb-2">آدرس‌ها و TXID</h4><dl>${detailItem('آدرس مبدا', t['Source Wallet Address'])}${detailItem('آدرس مقصد', t['Destination Wallet Address'])}${detailItem('TXID', t.Txid)}</dl></div></div><div class="mt-6"><h4 class="text-lg font-semibold text-cyan-400 mb-2">جزئیات مالی</h4><div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"><div class="glass-card p-4 rounded-lg">${detailItem('نام ارز', `<span class="font-sans">${t.currency}</span> (${t.currencie_slug})`)}</div><div class="glass-card p-4 rounded-lg">${detailItem('مقدار ارز', formatCurrency(t.currency_amount, 8))}</div><div class="glass-card p-4 rounded-lg">${detailItem('نرخ ارز', formatCurrency(t.currency_price,0))}</div><div class="glass-card p-4 rounded-lg">${detailItem('ارزش تومانی', formatCurrency(t.crypto_total_usdt,0))}</div><div class="glass-card p-4 rounded-lg">${detailItem('معادل تتری (نرخ استخر در زمان ثبت)', usdtEquivalentDisplay)}</div><div class="glass-card p-4 rounded-lg">${detailItem('کارمزد ثابت', formatCurrency(t.Fix_Wage,0))}</div><div class="glass-card p-4 rounded-lg">${detailItem('کارمزد VIP', formatCurrency(t.Vip_Amount,0))}</div><div class="glass-card p-4 rounded-lg">${detailItem('مبلغ ووچر', formatCurrency(t.Voucher_Amount,0))}</div><div class="glass-card p-4 rounded-lg">${detailItem('کارمزد شبکه (دریافتی)', networkWageDisplay)}</div><div class="glass-card p-4 rounded-lg">${detailItem('کارمزد شبکه (واقعی)', actualNetworkWageDisplay)}</div><div class="glass-card p-4 rounded-lg bg-slate-900/50">${detailItem('قیمت تمام شده (فی واحد)', formatCurrency(t.Cost_Basis,0), 'text-amber-400')}</div><div class="glass-card p-4 rounded-lg bg-slate-900/50">${detailItem('مبلغ کل', formatCurrency(t.Total_Amount,0), 'text-cyan-400 font-bold')}</div><div class="glass-card p-4 rounded-lg bg-slate-900/50">${detailItem('سود/زیان خالص', formatCurrency(t.NetProfit,0), t.NetProfit >= 0 ? 'text-green-400 font-bold' : 'text-red-400 font-bold')}</div></div></div>`;
-            detailsModal.classList.remove('hidden');
+            const bodyHtml = `<div class="grid grid-cols-1 md:grid-cols-2 gap-x-8"><div><h4 class="text-lg font-semibold text-cyan-400 mb-2">اطلاعات سفارش</h4><dl>${detailItem('ID سفارش', t.orderid)}${detailItem('تاریخ سفارش', new Date(t.orderdate).toLocaleString('fa-IR', { timeZone: 'Asia/Tehran' }))}${detailItem('اسلاگ سرویس', t.service_slug)}${detailItem('عنوان دسته', t.categories_title)}${detailItem('نوع سرویس', t.services_type === 'buy' ? 'فروش به مشتری' : 'خرید از مشتری')}${detailItem('کریپتو؟', t['Is Crypto?'] ? 'بله' : 'خیر')}${detailItem('کد تخفیف', t['Vouchers Code'] || '---')}${detailItem('توضیحات', `<p class="text-xs leading-relaxed font-sans">${t.description || '---'}</p>`)}</dl></div><div>${userInfoHtml}<h4 class="text-lg font-semibold text-cyan-400 mt-6 mb-2">آدرس‌ها و TXID</h4><dl>${detailItem('آدرس مبدا', t['Source Wallet Address'])}${detailItem('آدرس مقصد', t['Destination Wallet Address'])}${detailItem('TXID', t.Txid)}</dl></div></div><div class="mt-6"><h4 class="text-lg font-semibold text-cyan-400 mb-2">جزئیات مالی</h4><div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"><div class="glass-card p-4 rounded-lg">${detailItem('نام ارز', `<span class="font-sans">${t.currency}</span> (${t.currencie_slug})`)}</div><div class="glass-card p-4 rounded-lg">${detailItem('مقدار ارز', formatCurrency(t.currency_amount, 8))}</div><div class="glass-card p-4 rounded-lg">${detailItem('نرخ ارز', formatCurrency(t.currency_price,0))}</div><div class="glass-card p-4 rounded-lg">${detailItem('ارزش تومانی', formatCurrency(t.crypto_total_usdt,0))}</div><div class="glass-card p-4 rounded-lg">${detailItem('معادل تتری (نرخ استخر در زمان ثبت)', usdtEquivalentDisplay)}</div><div class="glass-card p-4 rounded-lg">${detailItem('کارمزد ثابت', formatCurrency(t.Fix_Wage,0))}</div><div class="glass-card p-4 rounded-lg">${detailItem('کارمزد VIP', formatCurrency(t.Vip_Amount,0))}</div><div class="glass-card p-4 rounded-lg">${detailItem('مبلغ ووچر', formatCurrency(t.Voucher_Amount,0))}</div><div class="glass-card p-4 rounded-lg">${detailItem('کارمزد شبکه (دریافتی)', networkWageDisplay)}</div><div class="glass-card p-4 rounded-lg">${detailItem('کارمزد شبکه (واقعی)', actualNetworkWageDisplay)}</div><div class="glass-card p-4 rounded-lg bg-slate-900/50">${detailItem('قیمت تمام شده (فی واحد)', formatCurrency(t.Cost_Basis,0), 'text-amber-400')}</div><div class="glass-card p-4 rounded-lg bg-slate-900/50">${detailItem('مبلغ کل', formatCurrency(t.Total_Amount,0), 'text-cyan-400 font-bold')}</div><div class="glass-card p-4 rounded-lg bg-slate-900/50">${detailItem('سود/زیان خالص', formatCurrency(t.NetProfit,0), t.NetProfit >= 0 ? 'text-green-400 font-bold' : 'text-red-400 font-bold')}</div></div></div>`;
+            showModalMessage('جزئیات کامل تراکنش', bodyHtml);
         }
 
         function showHistoryModal(t) {
-            const modalBody = document.getElementById('details-modal-body');
-            document.getElementById('details-modal-title').textContent = `تاریخچه تغییرات - ${String(t.orderid).includes('-') ? String(t.orderid).split('-')[1] : t.orderid}`;
             let historyHtml = '<div class="space-y-4">';
             t.editHistory.forEach((entry, index) => {
                 const historyDate = entry.timestamp ? new Date(entry.timestamp).toLocaleString('fa-IR', { timeZone: 'Asia/Tehran' }) : 'تاریخ نامشخص';
                 historyHtml += `<div class="glass-card p-4 rounded-lg"><p class="text-sm text-slate-400 mb-2">تغییر شماره ${index + 1} در تاریخ ${historyDate}</p><p class="text-white mb-3"><span class="text-slate-400">توضیحات:</span> ${entry.reason}</p><div class="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs"><div class="text-slate-300"><span class="text-slate-500">فیلد</span></div><div class="text-red-400"><span class="text-slate-500">مقدار قبلی</span></div><div class="text-green-400"><span class="text-slate-500">مقدار جدید</span></div>${Object.keys(entry.changes).map(key => `<div class="font-mono">${key}</div><div class="font-mono text-red-400">${formatCurrency(entry.changes[key].old, 4)}</div><div class="font-mono text-green-400">${formatCurrency(entry.changes[key].new, 4)}</div>`).join('')}</div></div>`;
             });
             historyHtml += '</div>';
-            modalBody.innerHTML = historyHtml;
-            detailsModal.classList.remove('hidden');
+            showModalMessage(`تاریخچه تغییرات - ${String(t.orderid).includes('-') ? String(t.orderid).split('-')[1] : t.orderid}`, historyHtml);
         }
 
         async function openTransactionModal(transaction = null) {
@@ -1320,7 +1316,7 @@
                 closeModal();
             } catch (error) {
                 console.error("Error saving transaction:", error);
-                showErrorModal(error.message);
+                showModalMessage('خطا', `<p class="text-lg text-center text-red-400">${error.message}</p>`);
             }
         }
 
@@ -1340,8 +1336,6 @@
         }
 
         function showPoolLogModal(slug) {
-            const modalBody = document.getElementById('details-modal-body');
-            document.getElementById('details-modal-title').textContent = `لاگ واریز و برداشت استخر ${slug}`;
             const pool = currencyPools[slug];
             let logHtml = `<div class="table-container overflow-y-auto max-h-[60vh]"><table class="w-full text-sm text-right text-slate-400"><thead class="text-xs text-slate-300 uppercase bg-slate-800/60 sticky top-0"><tr><th class="px-4 py-2">تاریخ</th><th class="px-4 py-2">نوع</th><th class="px-4 py-2">مقدار</th><th class="px-4 py-2">نرخ (تومان)</th><th class="px-4 py-2">ID سفارش</th></tr></thead><tbody>`;
             [...pool.log].reverse().forEach(entry => {
@@ -1349,8 +1343,7 @@
                 logHtml += `<tr class="border-b border-slate-700/50"><td class="px-4 py-3 whitespace-nowrap">${new Date(entry.date).toLocaleString('fa-IR', { timeZone: 'Asia/Tehran' })}</td><td class="px-4 py-3 ${typeClass}">${entry.type}</td><td class="px-4 py-3 font-mono">${formatCurrency(entry.amount, 6)}</td><td class="px-4 py-3 font-mono">${formatCurrency(entry.rate, 2)}</td><td class="px-4 py-3 font-mono text-xs">${String(entry.orderid).includes('-') ? String(entry.orderid).split('-')[1] : entry.orderid}</td></tr>`;
             });
             logHtml += '</tbody></table></div>';
-            modalBody.innerHTML = logHtml;
-            detailsModal.classList.remove('hidden');
+            showModalMessage(`لاگ واریز و برداشت استخر ${slug}`, logHtml);
         }
         
         // --- SUPPLIERS PAGE FUNCTIONS ---
@@ -1435,13 +1428,10 @@
         }
         
         function confirmDeleteSupplier(supplier) {
-            const modalTitle = document.getElementById('details-modal-title');
-            const modalBody = document.getElementById('details-modal-body');
-            modalTitle.textContent = 'تایید حذف تامین‌کننده';
-            modalBody.innerHTML = `<p class="text-lg text-center text-white">آیا از حذف تامین‌کننده «${supplier.name}» اطمینان دارید؟ این عمل قابل بازگشت نیست.</p><div class="flex justify-center gap-4 mt-6"><button id="confirm-delete-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-6 rounded-lg">بله، حذف کن</button><button id="cancel-delete-btn" class="bg-slate-600 hover:bg-slate-700 text-white font-bold py-2 px-6 rounded-lg">انصراف</button></div>`;
+            const bodyHtml = `<p class="text-lg text-center text-white">آیا از حذف تامین‌کننده «${supplier.name}» اطمینان دارید؟ این عمل قابل بازگشت نیست.</p><div class="flex justify-center gap-4 mt-6"><button id="confirm-delete-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-6 rounded-lg">بله، حذف کن</button><button id="cancel-delete-btn" class="bg-slate-600 hover:bg-slate-700 text-white font-bold py-2 px-6 rounded-lg">انصراف</button></div>`;
+            showModalMessage('تایید حذف تامین‌کننده', bodyHtml);
             document.getElementById('confirm-delete-btn').onclick = () => deleteSupplier(supplier.id);
             document.getElementById('cancel-delete-btn').onclick = closeModal;
-            detailsModal.classList.remove('hidden');
         }
 
         async function deleteSupplier(supplierId) {
@@ -1458,7 +1448,7 @@
             title.textContent = 'ثبت خرید جدید از تامین‌کننده';
 
             if (ALL_SUPPLIERS.length === 0) {
-                showErrorModal('ابتدا باید یک تامین‌کننده ثبت کنید.');
+                showModalMessage('خطا', '<p class="text-lg text-center text-red-400">ابتدا باید یک تامین‌کننده ثبت کنید.</p>');
                 return;
             }
             
@@ -1548,15 +1538,12 @@
                 closeModal();
             } catch (error) {
                 console.error("Error saving purchase transaction:", error);
-                showErrorModal(error.message);
+                showModalMessage('خطا', `<p class="text-lg text-center text-red-400">${error.message}</p>`);
             }
         }
         
         // --- REPORTING FUNCTIONS ---
         function showSupplierHistoryModal(supplier) {
-            const modalBody = document.getElementById('details-modal-body');
-            document.getElementById('details-modal-title').textContent = `تاریخچه خرید از ${supplier.name}`;
-            
             const supplierPurchases = ALL_TRANSACTIONS
                 .filter(t => t.transaction_source === 'supplier' && t.supplierId === supplier.id)
                 .sort((a, b) => new Date(b.orderdate) - new Date(a.orderdate));
@@ -1578,26 +1565,21 @@
                 });
             }
             historyHtml += '</tbody></table></div>';
-            modalBody.innerHTML = historyHtml;
-            detailsModal.classList.remove('hidden');
+            showModalMessage(`تاریخچه خرید از ${supplier.name}`, historyHtml);
         }
 
         function openComparativeReportModal() {
-            const modalBody = document.getElementById('details-modal-body');
-            document.getElementById('details-modal-title').textContent = 'گزارش مقایسه‌ای خرید ارز';
-
             const supplierPurchases = ALL_TRANSACTIONS.filter(t => t.transaction_source === 'supplier');
             const uniqueCurrencies = [...new Set(supplierPurchases.map(t => t.currencie_slug))];
 
             if (uniqueCurrencies.length === 0) {
-                modalBody.innerHTML = `<p class="text-center text-lg">هنوز هیچ خرید ارزی از تامین‌کنندگان ثبت نشده است.</p>`;
-                detailsModal.classList.remove('hidden');
+                showModalMessage('گزارش مقایسه‌ای', `<p class="text-center text-lg">هنوز هیچ خرید ارزی از تامین‌کنندگان ثبت نشده است.</p>`);
                 return;
             }
 
             const currencyOptions = uniqueCurrencies.map(slug => `<option value="${slug}">${slug}</option>`).join('');
 
-            modalBody.innerHTML = `
+            const bodyHtml = `
                 <div class="flex items-center gap-4 mb-6">
                     <label for="report-currency-select" class="text-slate-300 shrink-0">نمایش گزارش برای ارز:</label>
                     <select id="report-currency-select" class="bg-slate-800/50 border border-slate-700 text-slate-300 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block w-full p-2.5">
@@ -1610,11 +1592,11 @@
                 </div>
             `;
             
+            showModalMessage('گزارش مقایسه‌ای خرید ارز', bodyHtml);
+            
             document.getElementById('report-currency-select').addEventListener('change', (e) => {
                 renderComparativeReport(e.target.value);
             });
-
-            detailsModal.classList.remove('hidden');
         }
 
         function renderComparativeReport(currencySlug) {
@@ -1666,6 +1648,9 @@
             
             const exportBtn = document.getElementById('export-csv-btn');
             if (exportBtn) exportBtn.style.display = hasPermission('export_data') ? 'flex' : 'none';
+
+            const importBtn = document.getElementById('import-csv-btn');
+            if(importBtn) importBtn.style.display = hasPermission('create_transactions') ? 'flex' : 'none';
         }
         
         function renderUsersTable() {
@@ -1730,13 +1715,10 @@
         }
 
         function confirmDeleteUser(user) {
-            const modalTitle = document.getElementById('details-modal-title');
-            const modalBody = document.getElementById('details-modal-body');
-            modalTitle.textContent = 'تایید حذف کاربر';
-            modalBody.innerHTML = `<p class="text-lg text-center text-white">آیا از حذف کاربر «${user.name}» اطمینان دارید؟</p><div class="flex justify-center gap-4 mt-6"><button id="confirm-delete-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-6 rounded-lg">بله، حذف کن</button><button id="cancel-delete-btn" class="bg-slate-600 hover:bg-slate-700 text-white font-bold py-2 px-6 rounded-lg">انصراف</button></div>`;
+            const bodyHtml = `<p class="text-lg text-center text-white">آیا از حذف کاربر «${user.name}» اطمینان دارید؟</p><div class="flex justify-center gap-4 mt-6"><button id="confirm-delete-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-6 rounded-lg">بله، حذف کن</button><button id="cancel-delete-btn" class="bg-slate-600 hover:bg-slate-700 text-white font-bold py-2 px-6 rounded-lg">انصراف</button></div>`;
+            showModalMessage('تایید حذف کاربر', bodyHtml);
             document.getElementById('confirm-delete-btn').onclick = () => deleteUser(user.id);
             document.getElementById('cancel-delete-btn').onclick = closeModal;
-            detailsModal.classList.remove('hidden');
         }
 
         async function deleteUser(userId) {
@@ -1776,6 +1758,104 @@
                 await setDoc(doc(db, `artifacts/${appId}/public/data/roles`, roleId), roleData);
                 closeModal();
             } catch (error) { console.error("Error saving role:", error); }
+        }
+
+        // --- CSV IMPORT FUNCTIONS ---
+        function handleCsvFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            loadingOverlay.style.display = 'flex';
+            loadingText.textContent = 'در حال پردازش فایل CSV...';
+
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const text = e.target.result;
+                    const data = parseCSV(text);
+                    await processCsvData(data);
+                } catch (error) {
+                    console.error("Error processing CSV:", error);
+                    showModalMessage('خطا در پردازش فایل', `<p class="text-lg text-center text-red-400">${error.message}</p>`);
+                    loadingOverlay.style.display = 'none';
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = ''; // Reset file input
+        }
+
+        function parseCSV(text) {
+            const lines = text.trim().split(/\r\n|\n/);
+            const headers = lines[0].split(',').map(h => h.trim());
+            const rows = [];
+            for (let i = 1; i < lines.length; i++) {
+                if (!lines[i]) continue;
+                const values = lines[i].split(',');
+                const rowObject = {};
+                headers.forEach((header, index) => {
+                    rowObject[header] = values[index] ? values[index].trim() : '';
+                });
+                rows.push(rowObject);
+            }
+            return rows;
+        }
+
+        async function processCsvData(data) {
+            const appId = firebaseConfig.projectId;
+            const batch = writeBatch(db);
+            const transactionsRef = collection(db, `artifacts/${appId}/public/data/transactions`);
+            let successCount = 0;
+            let errorCount = 0;
+            const errors = [];
+
+            const numericFields = ['userid', 'currency_amount', 'crypto_total_usdt', 'currency_price', 'Cost_Basis', 'Network Wage', 'ActualNetwork Wage', 'Fix Wage', 'Vip Amount', 'Voucher Amount', 'NetProfit'];
+            
+            data.forEach((row, index) => {
+                try {
+                    const newTxData = {};
+                    Object.keys(row).forEach(key => {
+                        if (row[key] === '' || row[key] === null || row[key] === undefined) return;
+                        if (numericFields.includes(key)) {
+                            newTxData[key] = parseFloat(row[key]);
+                        } else if (key === 'orderdate') {
+                            // Assuming format YYYY/MM/DD HH:mm:ss or similar
+                            newTxData[key] = Timestamp.fromDate(new Date(row[key]));
+                        } else if (key === 'Is Crypto?') {
+                            newTxData[key] = row[key].toLowerCase() === 'true';
+                        } else {
+                            newTxData[key] = row[key];
+                        }
+                    });
+                    
+                    if (!newTxData.orderid || !newTxData.orderdate) {
+                        throw new Error("orderid and orderdate are required.");
+                    }
+
+                    newTxData.createdAt = serverTimestamp();
+                    newTxData.creatorId = currentUser.uid;
+                    newTxData.importSource = 'csv';
+
+                    const docRef = doc(transactionsRef); // Auto-generate ID
+                    batch.set(docRef, newTxData);
+                    successCount++;
+
+                } catch (e) {
+                    errorCount++;
+                    errors.push(`ردیف ${index + 2}: ${e.message}`);
+                }
+            });
+
+            loadingText.textContent = `در حال ثبت ${successCount} تراکنش در پایگاه داده...`;
+            await batch.commit();
+
+            loadingOverlay.style.display = 'none';
+
+            let reportHtml = `<p class="text-green-400 text-lg">تعداد ${successCount} تراکنش با موفقیت ثبت شد.</p>`;
+            if (errorCount > 0) {
+                reportHtml += `<p class="text-red-400 text-lg mt-4">تعداد ${errorCount} تراکنش با خطا مواجه شد:</p>`;
+                reportHtml += `<ul class="list-disc list-inside mt-2 text-red-300 text-sm max-h-60 overflow-y-auto">${errors.map(e => `<li>${e}</li>`).join('')}</ul>`;
+            }
+            showModalMessage('گزارش ورود دسته‌ای', reportHtml);
         }
 
         // --- AUTHENTICATION FLOW ---
