@@ -645,24 +645,28 @@
                     options: { responsive: true, maintainAspectRatio: false, interaction: { intersect: false, mode: 'index' }, plugins: { legend: { position: 'top', align: 'end', labels: { color: '#94a3b8', usePointStyle: true, boxWidth: 8, font: { family: 'Vazirmatn' } } }, tooltip: { rtl: true, textDirection: 'rtl', backgroundColor: 'rgba(2, 6, 23, 0.8)', titleFont: { family: 'Vazirmatn' }, bodyFont: { family: 'Vazirmatn' }, padding: 12, cornerRadius: 8, callbacks: { title: (tooltipItems) => new Date(tooltipItems[0].label).toLocaleDateString('fa-IR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }), label: (c) => `${c.dataset.label}: ${formatCurrency(c.raw,0)} تومان` } } }, scales: { x: { grid: { display: false }, ticks: { color: '#94a3b8', font: { family: 'Vazirmatn' }, maxRotation: 0, autoSkip: true, maxTicksLimit: 15, callback: (v, i, values) => new Date(labels[i]).toLocaleDateString('fa-IR', {day: 'numeric'}) } }, y: { position: 'right', beginAtZero: true, grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: '#94a3b8', font: { family: 'Vazirmatn' }, callback: yAxisCallback } }, y1: { position: 'left', beginAtZero: true, grid: { drawOnChartArea: false }, ticks: { color: '#f59e0b', font: { family: 'Vazirmatn' }, callback: yAxisCallback } } } }
                 });
             }
-            function renderProfitCompositionChart(data) {
+          function renderProfitCompositionChart(data) {
                 const settledData = data.filter(d => d.costBasisStatus !== 'pending' && d.costBasisStatus !== 'pending_import');
                 const selectedPeriod = periodFilter.options[periodFilter.selectedIndex].text;
                 document.getElementById('profit-composition-chart-title').textContent = `ترکیب سود خالص - ${selectedPeriod}`;
                 
-                // --- START: بخش اصلاح شده ---
+                // تابع کمکی برای خواندن مقادیر با هر دو نوع نام‌گذاری
+                const getValue = (transaction, keyWithUnderscore, keyWithSpace) => {
+                    const value = transaction[keyWithUnderscore] || transaction[keyWithSpace] || 0;
+                    return parseFloat(value);
+                };
+
                 const networkFeeProfit = settledData.reduce((sum, d) => {
-                    const price = parseFloat(d.currency_price) || 0;
-                    // استفاده از براکت برای خواندن نام‌های با فاصله
-                    const profitPerTx = ((parseFloat(d['Network Wage']) || 0) - (parseFloat(d['ActualNetwork Wage']) || 0)) * price;
+                    const price = getValue(d, 'currency_price', 'currency_price');
+                    const networkWage = getValue(d, 'Network_Wage', 'Network Wage');
+                    const actualNetworkWage = getValue(d, 'ActualNetwork_Wage', 'ActualNetwork Wage');
+                    const profitPerTx = (networkWage - actualNetworkWage) * price;
                     return sum + (isNaN(profitPerTx) ? 0 : profitPerTx);
                 }, 0);
                 
-                // استفاده از براکت برای خواندن نام‌های با فاصله
-                const totalFixWage = settledData.reduce((sum, d) => sum + (parseFloat(d['Fix Wage']) || 0), 0);
-                const totalVipAmount = settledData.reduce((sum, d) => sum + (parseFloat(d['Vip Amount']) || 0), 0);
-                const totalNetProfit = settledData.reduce((sum, d) => sum + (parseFloat(d.NetProfit) || 0), 0);
-                // --- END: بخش اصلاح شده ---
+                const totalFixWage = settledData.reduce((sum, d) => sum + getValue(d, 'Fix_Wage', 'Fix Wage'), 0);
+                const totalVipAmount = settledData.reduce((sum, d) => sum + getValue(d, 'Vip_Amount', 'Vip Amount'), 0);
+                const totalNetProfit = settledData.reduce((sum, d) => sum + getValue(d, 'NetProfit', 'NetProfit'), 0);
 
                 const marginProfit = totalNetProfit - networkFeeProfit - totalFixWage - totalVipAmount;
                 const chartData = [marginProfit, totalFixWage, totalVipAmount, networkFeeProfit].map(v => v > 0 ? v : 0);
@@ -1820,14 +1824,39 @@
             event.target.value = ''; // Reset file input
         }
 
-        function parseCSV(text) {
+      function parseCSV(text) {
             const lines = text.trim().split(/\r\n|\n/);
             if (lines.length < 2) return [];
-            const headers = lines[0].split(',').map(h => h.trim());
+            
+            // تابع کمکی برای تجزیه هوشمند یک ردیف با در نظر گرفتن ویرگول داخل کوتیشن
+            const parseRow = (row) => {
+                const result = [];
+                let current = '';
+                let inQuote = false;
+                for (let i = 0; i < row.length; i++) {
+                    const char = row[i];
+                    if (char === '"') {
+                        inQuote = !inQuote;
+                    } else if (char === ',' && !inQuote) {
+                        result.push(current.trim());
+                        current = '';
+                    } else {
+                        current += char;
+                    }
+                }
+                result.push(current.trim());
+                return result;
+            };
+
+            const headers = parseRow(lines[0]).map(h => h.trim());
             const rows = [];
+
             for (let i = 1; i < lines.length; i++) {
                 if (!lines[i]) continue;
-                const values = lines[i].split(',');
+                const values = parseRow(lines[i]);
+                // اگر تعداد مقادیر با هدرها نخواند، آن ردیف را نادیده بگیر تا خطا ایجاد نکند
+                if (values.length !== headers.length) continue;
+                
                 const rowObject = {};
                 headers.forEach((header, index) => {
                     rowObject[header] = values[index] ? values[index].trim() : '';
