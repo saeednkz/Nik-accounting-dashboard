@@ -645,34 +645,37 @@
                     options: { responsive: true, maintainAspectRatio: false, interaction: { intersect: false, mode: 'index' }, plugins: { legend: { position: 'top', align: 'end', labels: { color: '#94a3b8', usePointStyle: true, boxWidth: 8, font: { family: 'Vazirmatn' } } }, tooltip: { rtl: true, textDirection: 'rtl', backgroundColor: 'rgba(2, 6, 23, 0.8)', titleFont: { family: 'Vazirmatn' }, bodyFont: { family: 'Vazirmatn' }, padding: 12, cornerRadius: 8, callbacks: { title: (tooltipItems) => new Date(tooltipItems[0].label).toLocaleDateString('fa-IR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }), label: (c) => `${c.dataset.label}: ${formatCurrency(c.raw,0)} تومان` } } }, scales: { x: { grid: { display: false }, ticks: { color: '#94a3b8', font: { family: 'Vazirmatn' }, maxRotation: 0, autoSkip: true, maxTicksLimit: 15, callback: (v, i, values) => new Date(labels[i]).toLocaleDateString('fa-IR', {day: 'numeric'}) } }, y: { position: 'right', beginAtZero: true, grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: '#94a3b8', font: { family: 'Vazirmatn' }, callback: yAxisCallback } }, y1: { position: 'left', beginAtZero: true, grid: { drawOnChartArea: false }, ticks: { color: '#f59e0b', font: { family: 'Vazirmatn' }, callback: yAxisCallback } } } }
                 });
             }
-            
             function renderProfitCompositionChart(data) {
-                const settledData = data.filter(d => d.costBasisStatus !== 'pending');
-                const selectedPeriod = periodFilter.options[periodFilter.selectedIndex].text;
-                document.getElementById('profit-composition-chart-title').textContent = `ترکیب سود خالص - ${selectedPeriod}`;
-                
-                const networkFeeProfit = settledData.reduce((sum, d) => {
-                    const price = parseFloat(d.currency_price) || 0;
-                    const profitPerTx = ((parseFloat(d.Network_Wage) || 0) - (parseFloat(d.ActualNetwork_Wage) || 0)) * price;
-                    return sum + (isNaN(profitPerTx) ? 0 : profitPerTx);
-                }, 0);
-                
-                const totalFixWage = settledData.reduce((sum, d) => sum + (parseFloat(d.Fix_Wage) || 0), 0);
-                const totalVipAmount = settledData.reduce((sum, d) => sum + (parseFloat(d.Vip_Amount) || 0), 0);
-                const totalNetProfit = settledData.reduce((sum, d) => sum + (parseFloat(d.NetProfit) || 0), 0);
+                const settledData = data.filter(d => d.costBasisStatus !== 'pending' && d.costBasisStatus !== 'pending_import');
+                const selectedPeriod = periodFilter.options[periodFilter.selectedIndex].text;
+                document.getElementById('profit-composition-chart-title').textContent = `ترکیب سود خالص - ${selectedPeriod}`;
+                
+                // --- START: بخش اصلاح شده ---
+                const networkFeeProfit = settledData.reduce((sum, d) => {
+                    const price = parseFloat(d.currency_price) || 0;
+                    // استفاده از براکت برای خواندن نام‌های با فاصله
+                    const profitPerTx = ((parseFloat(d['Network Wage']) || 0) - (parseFloat(d['ActualNetwork Wage']) || 0)) * price;
+                    return sum + (isNaN(profitPerTx) ? 0 : profitPerTx);
+                }, 0);
+                
+                // استفاده از براکت برای خواندن نام‌های با فاصله
+                const totalFixWage = settledData.reduce((sum, d) => sum + (parseFloat(d['Fix Wage']) || 0), 0);
+                const totalVipAmount = settledData.reduce((sum, d) => sum + (parseFloat(d['Vip Amount']) || 0), 0);
+                const totalNetProfit = settledData.reduce((sum, d) => sum + (parseFloat(d.NetProfit) || 0), 0);
+                // --- END: بخش اصلاح شده ---
 
-                const marginProfit = totalNetProfit - networkFeeProfit - totalFixWage - totalVipAmount;
-                const chartData = [marginProfit, totalFixWage, totalVipAmount, networkFeeProfit].map(v => v > 0 ? v : 0);
-                const labels = ['سود مارجین', 'کارمزد ثابت', 'کارمزد VIP', 'سود کارمزد شبکه'];
-                const colors = ['#0ea5e9', '#10b981', '#f97316', '#8b5cf6'];
-                const ctx = document.getElementById('profitCompositionChart').getContext('2d');
-                if(profitCompositionChart) profitCompositionChart.destroy();
-                profitCompositionChart = new Chart(ctx, {
-                    type: 'doughnut',
-                    data: { labels, datasets: [{ data: chartData, backgroundColor: colors, borderColor: '#020617', borderWidth: 4, hoverOffset: 12 }] },
-                    options: { responsive: true, maintainAspectRatio: false, cutout: '70%', plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8', usePointStyle: true, boxWidth: 8, padding: 20, font: { family: 'Vazirmatn' } } }, tooltip: { rtl: true, textDirection: 'rtl', backgroundColor: 'rgba(2, 6, 23, 0.8)', titleFont: { family: 'Vazirmatn' }, bodyFont: { family: 'Vazirmatn' }, padding: 12, cornerRadius: 8, callbacks: { label: (c) => `${c.label}: ${formatCurrency(c.raw,0)} تومان` } } } }
-                });
-            }
+                const marginProfit = totalNetProfit - networkFeeProfit - totalFixWage - totalVipAmount;
+                const chartData = [marginProfit, totalFixWage, totalVipAmount, networkFeeProfit].map(v => v > 0 ? v : 0);
+                const labels = ['سود مارجین', 'کارمزد ثابت', 'کارمزد VIP', 'سود کارمزد شبکه'];
+                const colors = ['#0ea5e9', '#10b981', '#f97316', '#8b5cf6'];
+                const ctx = document.getElementById('profitCompositionChart').getContext('2d');
+                if(profitCompositionChart) profitCompositionChart.destroy();
+                profitCompositionChart = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: { labels, datasets: [{ data: chartData, backgroundColor: colors, borderColor: '#020617', borderWidth: 4, hoverOffset: 12 }] },
+                    options: { responsive: true, maintainAspectRatio: false, cutout: '70%', plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8', usePointStyle: true, boxWidth: 8, padding: 20, font: { family: 'Vazirmatn' } } }, tooltip: { rtl: true, textDirection: 'rtl', backgroundColor: 'rgba(2, 6, 23, 0.8)', titleFont: { family: 'Vazirmatn' }, bodyFont: { family: 'Vazirmatn' }, padding: 12, cornerRadius: 8, callbacks: { label: (c) => `${c.label}: ${formatCurrency(c.raw,0)} تومان` } } } }
+                });
+            }
 
             displayCurrentTime();
             populateDashboardFilters();
