@@ -198,18 +198,23 @@
                         </div>
                     </header>
                     
-                    <div class="glass-card p-4 rounded-xl mb-6">
-                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                            <input type="text" id="tx-search-input" placeholder="جستجو در تمام جزئیات..." class="bg-slate-800/50 border border-slate-700 text-slate-300 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block w-full p-2.5">
-                            <input type="text" id="tx-start-date" placeholder="از تاریخ" class="persian-datepicker bg-slate-800/50 border border-slate-700 text-slate-300 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block w-full p-2.5">
-                            <input type="text" id="tx-end-date" placeholder="تا تاریخ" class="persian-datepicker bg-slate-800/50 border border-slate-700 text-slate-300 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block w-full p-2.5">
-                            <select id="tx-type-filter" class="bg-slate-800/50 border border-slate-700 text-slate-300 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block w-full p-2.5">
-                                <option value="">همه انواع</option>
-                                <option value="sell">خرید از مشتری</option>
-                                <option value="buy">فروش به مشتری</option>
-                            </select>
-                        </div>
-                    </div>
+                  <div class="glass-card p-4 rounded-xl mb-6">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        <input type="text" id="tx-search-input" placeholder="جستجو در تمام جزئیات..." class="bg-slate-800/50 border border-slate-700 text-slate-300 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block w-full p-2.5">
+        
+        <select id="tx-currency-filter" class="bg-slate-800/50 border border-slate-700 text-slate-300 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block w-full p-2.5">
+            <option value="">همه ارزها</option>
+        </select>
+
+        <input type="text" id="tx-start-date" placeholder="از تاریخ" class="persian-datepicker bg-slate-800/50 border border-slate-700 text-slate-300 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block w-full p-2.5">
+        <input type="text" id="tx-end-date" placeholder="تا تاریخ" class="persian-datepicker bg-slate-800/50 border border-slate-700 text-slate-300 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block w-full p-2.5">
+        <select id="tx-type-filter" class="bg-slate-800/50 border border-slate-700 text-slate-300 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block w-full p-2.5">
+            <option value="">همه انواع</option>
+            <option value="sell">خرید از مشتری</option>
+            <option value="buy">فروش به مشتری</option>
+        </select>
+    </div>
+</div>
 
                     <div class="flex-grow glass-card rounded-2xl overflow-hidden flex flex-col">
                         <div class="table-container overflow-x-auto flex-grow">
@@ -740,15 +745,19 @@
             }));
         }
 
-        function setupTransactionsPage() {
-             $(".persian-datepicker").persianDatepicker({
+  function setupTransactionsPage() {
+            $(".persian-datepicker").persianDatepicker({
                 format: 'YYYY/MM/DD', timeZone: 'Asia/Tehran', initialValue: false,
                 onSelect: () => { currentPage = 1; filterAndRenderTransactions(); }
             });
             const searchInput = document.getElementById('tx-search-input');
             const typeFilter = document.getElementById('tx-type-filter');
+            const currencyFilter = document.getElementById('tx-currency-filter');
+
             searchInput.addEventListener('input', () => { currentPage = 1; filterAndRenderTransactions(); });
             typeFilter.addEventListener('change', () => { currentPage = 1; filterAndRenderTransactions(); });
+            currencyFilter.addEventListener('change', () => { currentPage = 1; filterAndRenderTransactions(); });
+            
             document.querySelectorAll('.persian-datepicker').forEach(input => {
                 input.addEventListener('input', (e) => { if(e.target.value === '') filterAndRenderTransactions(); });
             });
@@ -819,6 +828,7 @@
 
                     return { ...data, id: doc.id, orderdate: dateObject, editHistory: processedHistory };
                 });
+populateCurrencyFilter(); // <-- این خط جدید است
                 
                 if (isProcessingPools) {
                     console.log("Pool processing is already running, skipping this update.");
@@ -1014,25 +1024,39 @@ async function processAllTransactionsForPools() {
         }));
         
         // --- TRANSACTIONS PAGE FUNCTIONS ---
-        function getFilteredData() {
+function populateCurrencyFilter() {
+            const currencyFilter = document.getElementById('tx-currency-filter');
+            if (!currencyFilter) return;
+            const selectedValue = currencyFilter.value;
+            const uniqueCurrencies = [...new Set(ALL_TRANSACTIONS.map(t => t.currencie_slug))].filter(Boolean).sort();
+            currencyFilter.innerHTML = '<option value="">همه ارزها</option>';
+            uniqueCurrencies.forEach(slug => {
+                currencyFilter.innerHTML += `<option value="${slug}">${slug.toUpperCase()}</option>`;
+            });
+            currencyFilter.value = selectedValue;
+        }
+ function getFilteredData() {
             const searchTerm = document.getElementById('tx-search-input').value.toLowerCase();
             const startDateEl = document.getElementById('tx-start-date');
             const endDateEl = document.getElementById('tx-end-date');
             let startDateUnix = 0;
             const startDatePicker = $(startDateEl).data('datepicker');
             if (startDateEl.value && startDatePicker && startDatePicker.getState().selected) {
-                 startDateUnix = startDatePicker.getState().selected.unixDate;
+                startDateUnix = startDatePicker.getState().selected.unixDate;
             }
             let endDateUnix = Infinity;
             const endDatePicker = $(endDateEl).data('datepicker');
             if (endDateEl.value && endDatePicker && endDatePicker.getState().selected) {
-                 endDateUnix = endDatePicker.getState().selected.unixDate + 86400000;
+                endDateUnix = endDatePicker.getState().selected.unixDate + 86400000;
             }
             const type = document.getElementById('tx-type-filter').value;
+            const currency = document.getElementById('tx-currency-filter').value;
+
             return ALL_TRANSACTIONS.filter(t => {
                 const typeMatch = type === '' || t.services_type === type;
                 const date = new Date(t.orderdate).getTime();
                 const dateMatch = date >= startDateUnix && date < endDateUnix;
+                const currencyMatch = currency === '' || t.currencie_slug === currency;
 
                 let searchMatch = searchTerm === '';
                 if (!searchMatch) {
@@ -1040,7 +1064,7 @@ async function processAllTransactionsForPools() {
                     searchMatch = searchableString.includes(searchTerm);
                 }
 
-                return searchMatch && typeMatch && dateMatch;
+                return searchMatch && typeMatch && dateMatch && currencyMatch;
             });
         }
 
