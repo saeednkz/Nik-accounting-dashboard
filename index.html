@@ -614,37 +614,88 @@
                 }
             }
             
-            function renderSalesProfitChart(data) {
-                const settledData = data.filter(d => d.costBasisStatus !== 'pending');
-                const { startDate, endDate } = getSelectedDateRange();
-                const selectedPeriod = periodFilter.options[periodFilter.selectedIndex].text;
-                document.getElementById('sales-profit-chart-title').textContent = `مقایسه فروش و سود - ${selectedPeriod}`;
-                const aggregatedData = {};
-                for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-                    aggregatedData[d.toISOString().split('T')[0]] = { sales: 0, profit: 0 };
-                }
-                settledData.forEach(t => {
-                    const key = t.orderdate.toISOString().split('T')[0];
-                    if (aggregatedData[key]) {
-                        if (t.services_type === 'buy') aggregatedData[key].sales += (parseFloat(t.Total_Amount) || 0);
-                        aggregatedData[key].profit += (parseFloat(t.NetProfit) || 0);
-                    }
-                });
-                const labels = Object.keys(aggregatedData);
-                const salesData = Object.values(aggregatedData).map(d => d.sales);
-                const profitData = Object.values(aggregatedData).map(d => d.profit);
-                const ctx = document.getElementById('salesProfitChart').getContext('2d');
-                if(salesProfitChart) salesProfitChart.destroy();
-                const yAxisCallback = (value) => {
-                    if (value === 0) return '۰';
-                    return `${new Intl.NumberFormat('fa-IR').format(value / 1000000)} M`;
-                };
-                salesProfitChart = new Chart(ctx, {
-                    type: 'line',
-                    data: { labels, datasets: [{ label: 'سود خالص', data: profitData, borderColor: '#f59e0b', backgroundColor: 'rgba(245, 158, 11, 0.1)', fill: true, borderWidth: 2, tension: 0.4, pointRadius: 0, pointHoverRadius: 6, pointBackgroundColor: '#f59e0b', yAxisID: 'y1' }, { label: 'حجم فروش', data: salesData, backgroundColor: 'rgba(34, 211, 238, 0.1)', borderColor: '#22d3ee', fill: true, borderWidth: 2, tension: 0.4, pointRadius: 0, pointHoverRadius: 6, pointBackgroundColor: '#22d3ee', yAxisID: 'y' }] },
-                    options: { responsive: true, maintainAspectRatio: false, interaction: { intersect: false, mode: 'index' }, plugins: { legend: { position: 'top', align: 'end', labels: { color: '#94a3b8', usePointStyle: true, boxWidth: 8, font: { family: 'Vazirmatn' } } }, tooltip: { rtl: true, textDirection: 'rtl', backgroundColor: 'rgba(2, 6, 23, 0.8)', titleFont: { family: 'Vazirmatn' }, bodyFont: { family: 'Vazirmatn' }, padding: 12, cornerRadius: 8, callbacks: { title: (tooltipItems) => new Date(tooltipItems[0].label).toLocaleDateString('fa-IR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }), label: (c) => `${c.dataset.label}: ${formatCurrency(c.raw,0)} تومان` } } }, scales: { x: { grid: { display: false }, ticks: { color: '#94a3b8', font: { family: 'Vazirmatn' }, maxRotation: 0, autoSkip: true, maxTicksLimit: 15, callback: (v, i, values) => new Date(labels[i]).toLocaleDateString('fa-IR', {day: 'numeric'}) } }, y: { position: 'right', beginAtZero: true, grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: '#94a3b8', font: { family: 'Vazirmatn' }, callback: yAxisCallback } }, y1: { position: 'left', beginAtZero: true, grid: { drawOnChartArea: false }, ticks: { color: '#f59e0b', font: { family: 'Vazirmatn' }, callback: yAxisCallback } } } }
-                });
-            }
+          function renderSalesProfitChart(data) {
+                const settledData = data.filter(d => d.costBasisStatus !== 'pending' && d.costBasisStatus !== 'pending_import');
+                const { startDate, endDate } = getSelectedDateRange();
+                const selectedPeriod = periodFilter.options[periodFilter.selectedIndex].text;
+                document.getElementById('sales-profit-chart-title').textContent = `مقایسه فروش و سود - ${selectedPeriod}`;
+                const aggregatedData = {};
+                for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+                    aggregatedData[d.toISOString().split('T')[0]] = { sales: 0, profit: 0 };
+                }
+                settledData.forEach(t => {
+                    const key = t.orderdate.toISOString().split('T')[0];
+                    if (aggregatedData[key]) {
+                        if (t.services_type === 'buy') aggregatedData[key].sales += (parseFloat(t.Total_Amount) || 0);
+                        aggregatedData[key].profit += (parseFloat(t.NetProfit) || 0);
+                    }
+                });
+                const labels = Object.keys(aggregatedData);
+                const salesData = Object.values(aggregatedData).map(d => d.sales);
+                const profitData = Object.values(aggregatedData).map(d => d.profit);
+                const ctx = document.getElementById('salesProfitChart').getContext('2d');
+                if(salesProfitChart) salesProfitChart.destroy();
+                const yAxisCallback = (value) => {
+                    if (value === 0) return '۰';
+                    return `${new Intl.NumberFormat('fa-IR').format(value / 1000000)} M`;
+                };
+                salesProfitChart = new Chart(ctx, {
+                    type: 'line',
+                    data: { 
+                        labels, 
+                        datasets: [
+                            { 
+                                label: 'سود خالص', 
+                                data: profitData, 
+                                borderColor: '#f59e0b', 
+                                backgroundColor: 'rgba(245, 158, 11, 0.1)', 
+                                fill: true, 
+                                borderWidth: 2, 
+                                tension: 0.4, 
+                                pointRadius: 0, 
+                                pointHoverRadius: 6, 
+                                pointBackgroundColor: '#f59e0b',
+                                // yAxisID: 'y1'  <-- این خط حذف شد
+                            }, 
+                            { 
+                                label: 'حجم فروش', 
+                                data: salesData, 
+                                backgroundColor: 'rgba(34, 211, 238, 0.1)', 
+                                borderColor: '#22d3ee', 
+                                fill: true, 
+                                borderWidth: 2, 
+                                tension: 0.4, 
+                                pointRadius: 0, 
+                                pointHoverRadius: 6, 
+                                pointBackgroundColor: '#22d3ee',
+                                // yAxisID: 'y'   <-- این خط حذف شد
+                            }
+                        ] 
+                    },
+                    options: { 
+                        responsive: true, 
+                        maintainAspectRatio: false, 
+                        interaction: { intersect: false, mode: 'index' }, 
+                        plugins: { 
+                            legend: { position: 'top', align: 'end', labels: { color: '#94a3b8', usePointStyle: true, boxWidth: 8, font: { family: 'Vazirmatn' } } }, 
+                            tooltip: { rtl: true, textDirection: 'rtl', backgroundColor: 'rgba(2, 6, 23, 0.8)', titleFont: { family: 'Vazirmatn' }, bodyFont: { family: 'Vazirmatn' }, padding: 12, cornerRadius: 8, callbacks: { title: (tooltipItems) => new Date(tooltipItems[0].label).toLocaleDateString('fa-IR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }), label: (c) => `${c.dataset.label}: ${formatCurrency(c.raw,0)} تومان` } } 
+                        }, 
+                        scales: { 
+                            x: { 
+                                grid: { display: false }, 
+                                ticks: { color: '#94a3b8', font: { family: 'Vazirmatn' }, maxRotation: 0, autoSkip: true, maxTicksLimit: 15, callback: (v, i, values) => new Date(labels[i]).toLocaleDateString('fa-IR', {day: 'numeric'}) } 
+                            }, 
+                            y: { // فقط یک محور عمودی باقی می‌ماند
+                                position: 'right', 
+                                beginAtZero: true, 
+                                grid: { color: 'rgba(255, 255, 255, 0.05)' }, 
+                                ticks: { color: '#94a3b8', font: { family: 'Vazirmatn' }, callback: yAxisCallback } 
+                            },
+                            // y1: { ... }  <-- کل این بلاک حذف شد
+                        } 
+                    }
+                });
+            }
           function renderProfitCompositionChart(data) {
                 const settledData = data.filter(d => d.costBasisStatus !== 'pending' && d.costBasisStatus !== 'pending_import');
                 const selectedPeriod = periodFilter.options[periodFilter.selectedIndex].text;
