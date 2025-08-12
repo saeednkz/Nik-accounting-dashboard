@@ -803,116 +803,119 @@
         }
         
         // --- DATA PROCESSING ---
-    async function processAllTransactionsForPools() {
-            if (isProcessingPools) return;
-            isProcessingPools = true;
+   async function processAllTransactionsForPools() {
+    if (isProcessingPools) return;
+    isProcessingPools = true;
 
-            const localTransactions = JSON.parse(JSON.stringify(ALL_TRANSACTIONS));
-            const sortedTransactions = localTransactions.sort((a, b) => new Date(a.orderdate) - new Date(b.orderdate));
-            
-            const updatesBatch = writeBatch(db);
-            let updatesNeeded = false;
-            
-            // یک دیکشنری برای نگهداری استخر FIFO برای هر ارز به صورت جداگانه
-            const fifoPools = {};
-            const allCurrencySlugs = [...new Set(sortedTransactions.map(t => t.currencie_slug).filter(Boolean))];
-            allCurrencySlugs.forEach(slug => {
-                fifoPools[slug] = []; // Each element is { qty: Number, cost: Number }
-            });
+    try {
+        const localTransactions = JSON.parse(JSON.stringify(ALL_TRANSACTIONS));
+        const sortedTransactions = localTransactions.sort((a, b) => new Date(a.orderdate) - new Date(b.orderdate));
+        
+        const updatesBatch = writeBatch(db);
+        let updatesNeeded = false;
+        
+        const fifoPools = {};
+        const pendingSalesQueues = {}; // صف انتظار برای هر ارز
 
-            for (const t of sortedTransactions) {
-                const slug = t.currencie_slug;
-                if (!slug) continue;
+        const allCurrencySlugs = [...new Set(sortedTransactions.map(t => t.currencie_slug).filter(Boolean))];
+        allCurrencySlugs.forEach(slug => {
+            fifoPools[slug] = []; // لایه‌های خرید
+            pendingSalesQueues[slug] = []; // تراکنش‌های فروش در انتظار
+        });
 
-                const currentPool = fifoPools[slug];
+        for (const t of sortedTransactions) {
+            const slug = t.currencie_slug;
+            if (!slug) continue;
 
-                if (t.services_type === 'sell') { // خرید از مشتری/تامین‌کننده -> افزودن به استخر
-                    currentPool.push({ qty: t.currency_amount, cost: t.currency_price });
-                    
-                    // اطمینان از اینکه سود و هزینه خریدها صفر و تسویه شده است
-                    if (t.NetProfit !== 0 || t.costBasisStatus !== 'settled' || t.Cost_Basis !== t.currency_price) {
-                        updatesBatch.update(doc(db, `artifacts/${firebaseConfig.projectId}/public/data/transactions`, t.id), {
-                            NetProfit: 0,
-                            costBasisStatus: 'settled',
-                            Cost_Basis: t.currency_price
-                        });
-                        updatesNeeded = true;
-                    }
+            const currentPool = fifoPools[slug];
+            const currentQueue = pendingSalesQueues[slug];
 
-                } else { // فروش به مشتری -> برداشت از استخر
-                    let saleAmount = t.currency_amount;
-                    let totalCostForThisSale = 0;
+            if (t.services_type === 'buy') { // فروش به مشتری
+                // همیشه ابتدا تراکنش فروش را به صف اضافه کن
+                currentQueue.push(t);
+            } else { // خرید از مشتری/تامین‌کننده
+                // خرید جدید را به استخر اضافه کن
+                currentPool.push({ qty: t.currency_amount, cost: t.currency_price });
+                if (t.NetProfit !== 0 || t.costBasisStatus !== 'settled') {
+                    updatesBatch.update(doc(db, `artifacts/${firebaseConfig.projectId}/public/data/transactions`, t.id), { NetProfit: 0, costBasisStatus: 'settled', Cost_Basis: t.currency_price });
+                    updatesNeeded = true;
+                }
+            }
 
-                    const availableQty = currentPool.reduce((sum, layer) => sum + layer.qty, 0);
+            // --- بخش کلیدی جدید: پردازش صف انتظار ---
+            // بعد از هر تراکنش (چه خرید و چه فروش)، سعی کن صف را پردازش کنی
+            let queueChanged = true;
+            while(queueChanged && currentQueue.length > 0) {
+                queueChanged = false;
+                const availableQty = currentPool.reduce((sum, layer) => sum + layer.qty, 0);
+                const nextSale = currentQueue[0]; // اولین فروش در صف
 
-                    if (availableQty < saleAmount) {
-                        // اگر موجودی کافی نیست، تراکنش را pending نگه دار و ادامه بده
-                        if (t.costBasisStatus !== 'pending') {
-                            updatesBatch.update(doc(db, `artifacts/${firebaseConfig.projectId}/public/data/transactions`, t.id), {
-                                costBasisStatus: 'pending',
-                                Cost_Basis: 0,
-                                NetProfit: 0
-                            });
-                            updatesNeeded = true;
-                        }
-                        continue; // در این دور پردازش، این تراکنش را رها کن
-                    }
+                if (availableQty >= nextSale.currency_amount) {
+                    // موجودی کافی است، این فروش را پردازش کن
+                    let saleAmount = nextSale.currency_amount;
+                    let totalCostForThisSale = 0;
+                    
+                    for (const layer of currentPool) {
+                        if (saleAmount <= 0) break;
+                        const amountFromThisLayer = Math.min(saleAmount, layer.qty);
+                        totalCostForThisSale += amountFromThisLayer * layer.cost;
+                        layer.qty -= amountFromThisLayer;
+                        saleAmount -= amountFromThisLayer;
+                    }
 
-                    // اگر موجودی کافی است، هزینه را با منطق FIFO محاسبه کن
-                    let amountToTake = saleAmount;
-                    for (const layer of currentPool) {
-                        if (amountToTake <= 0) break;
+                    while (currentPool.length > 0 && currentPool[0].qty <= 0) {
+                        currentPool.shift();
+                    }
 
-                        const amountFromThisLayer = Math.min(amountToTake, layer.qty);
-                        totalCostForThisSale += amountFromThisLayer * layer.cost;
-                        layer.qty -= amountFromThisLayer;
-                        amountToTake -= amountFromThisLayer;
-                    }
+                    const newCostBasis = nextSale.currency_amount > 0 ? totalCostForThisSale / nextSale.currency_amount : 0;
+                    const actualNetworkWageToman = (nextSale.ActualNetwork_Wage || 0) * nextSale.currency_price;
+                    const newNetProfit = nextSale.Total_Amount - (totalCostForThisSale + actualNetworkWageToman);
 
-                    // لایه‌های خالی شده را از ابتدای استخر حذف کن
-                    while (currentPool.length > 0 && currentPool[0].qty <= 0) {
-                        currentPool.shift();
-                    }
+                    if (nextSale.Cost_Basis !== newCostBasis || nextSale.NetProfit !== newNetProfit || nextSale.costBasisStatus !== 'settled') {
+                        updatesBatch.update(doc(db, `artifacts/${firebaseConfig.projectId}/public/data/transactions`, nextSale.id), {
+                            costBasisStatus: 'settled',
+                            Cost_Basis: newCostBasis,
+                            NetProfit: newNetProfit
+                        });
+                        updatesNeeded = true;
+                    }
 
-                    const newCostBasis = saleAmount > 0 ? totalCostForThisSale / saleAmount : 0;
-                    // طبق منطق اصلی، هزینه کارمزد شبکه با نرخ فروش محاسبه می‌شود
-                    const actualNetworkWageToman = (t.ActualNetwork_Wage || 0) * t.currency_price; 
-                    const newNetProfit = t.Total_Amount - (totalCostForThisSale + actualNetworkWageToman);
+                    currentQueue.shift(); // تراکنش پردازش شده را از صف حذف کن
+                    queueChanged = true; // چون صف تغییر کرده، دوباره حلقه را چک کن
+                }
+            }
+        }
 
-                    // فقط در صورت نیاز به تغییر، در دیتابیس آپدیت کن
-                    if (t.Cost_Basis !== newCostBasis || t.NetProfit !== newNetProfit || t.costBasisStatus !== 'settled') {
-                        updatesBatch.update(doc(db, `artifacts/${firebaseConfig.projectId}/public/data/transactions`, t.id), {
-                            costBasisStatus: 'settled',
-                            Cost_Basis: newCostBasis,
-                            NetProfit: newNetProfit
-                        });
-                        updatesNeeded = true;
-                    }
-                }
-            }
+        // در پایان، اگر تراکنشی در صف باقی مانده، یعنی موجودی کافی نبوده و باید pending بماند
+        for(const slug of allCurrencySlugs) {
+            for(const remainingSale of pendingSalesQueues[slug]) {
+                if (remainingSale.costBasisStatus !== 'pending') {
+                    updatesBatch.update(doc(db, `artifacts/${firebaseConfig.projectId}/public/data/transactions`, remainingSale.id), { costBasisStatus: 'pending', Cost_Basis: 0, NetProfit: 0 });
+                    updatesNeeded = true;
+                }
+            }
+        }
+        
+        // آپدیت وضعیت نهایی استخرها برای نمایش در UI
+        currencyPools = {};
+        for(const slug of allCurrencySlugs) {
+            const finalPool = fifoPools[slug];
+            const finalPoolQty = finalPool.reduce((sum, layer) => sum + layer.qty, 0);
+            const finalPoolValue = finalPool.reduce((sum, layer) => sum + (layer.qty * layer.cost), 0);
+            const finalAvgCost = finalPoolQty > 0 ? finalPoolValue / finalPoolQty : 0;
+            currencyPools[slug] = { quantity: finalPoolQty, weightedAvgCost: finalAvgCost, log: [] };
+        }
 
-            // بعد از پردازش تمام تراکنش‌ها، وضعیت نهایی استخرها را برای نمایش در جدول آماده کن
-            const finalPoolsState = {};
-            for(const slug of allCurrencySlugs) {
-                const finalPool = fifoPools[slug];
-                const finalPoolQty = finalPool.reduce((sum, layer) => sum + layer.qty, 0);
-                const finalPoolValue = finalPool.reduce((sum, layer) => sum + (layer.qty * layer.cost), 0);
-                const finalAvgCost = finalPoolQty > 0 ? finalPoolValue / finalPoolQty : 0;
-                finalPoolsState[slug] = {
-                    quantity: finalPoolQty,
-                    weightedAvgCost: finalAvgCost,
-                    log: [] // Note: Rebuilding the log would require more extensive changes
-                };
-            }
-            currencyPools = finalPoolsState;
-
-            if (updatesNeeded) {
-                console.log("Committing batch updates for FIFO cost calculation...");
-                await updatesBatch.commit().catch(err => console.error("FIFO Batch commit failed:", err));
-            }
-
-            isProcessingPools = false;
-        }
+        if (updatesNeeded) {
+            console.log("Committing final batch updates...");
+            await updatesBatch.commit();
+        }
+    } catch (error) {
+        console.error("Error in processAllTransactionsForPools:", error);
+    } finally {
+        isProcessingPools = false;
+    }
+}
 
         // --- UI & PAGE LOGIC ---
         let salesProfitChart, profitCompositionChart;
