@@ -1784,102 +1784,125 @@
         }
 
         // --- CSV IMPORT FUNCTIONS ---
-        function handleCsvFile(event) {
-            const file = event.target.files[0];
-            if (!file) return;
+      function handleCsvFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
 
-            loadingOverlay.style.display = 'flex';
-            loadingText.textContent = 'در حال پردازش فایل CSV...';
+            loadingOverlay.style.display = 'flex';
+            loadingText.textContent = 'در حال پردازش فایل CSV...';
 
-            const reader = new FileReader();
-            reader.onload = async (e) => {
-                try {
-                    const text = e.target.result;
-                    const data = parseCSV(text);
-                    await processCsvData(data);
-                } catch (error) {
-                    console.error("Error processing CSV:", error);
-                    showModalMessage('خطا در پردازش فایل', `<p class="text-lg text-center text-red-400">${error.message}</p>`);
-                    loadingOverlay.style.display = 'none';
-                }
-            };
-            reader.readAsText(file);
-            event.target.value = ''; // Reset file input
-        }
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const text = e.target.result;
+                    const data = parseCSV(text);
+                    await processCsvData(data);
+                } catch (error) {
+                    console.error("Error processing CSV:", error);
+                    showModalMessage('خطا در پردازش فایل', `<p class="text-lg text-center text-red-400">${error.message}</p>`);
+                } finally {
+                    loadingOverlay.style.display = 'none';
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = ''; // Reset file input
+        }
 
-        function parseCSV(text) {
-            const lines = text.trim().split(/\r\n|\n/);
-            const headers = lines[0].split(',').map(h => h.trim());
-            const rows = [];
-            for (let i = 1; i < lines.length; i++) {
-                if (!lines[i]) continue;
-                const values = lines[i].split(',');
-                const rowObject = {};
-                headers.forEach((header, index) => {
-                    rowObject[header] = values[index] ? values[index].trim() : '';
-                });
-                rows.push(rowObject);
-            }
-            return rows;
-        }
+        function parseCSV(text) {
+            const lines = text.trim().split(/\r\n|\n/);
+            if (lines.length < 2) return [];
+            const headers = lines[0].split(',').map(h => h.trim());
+            const rows = [];
+            for (let i = 1; i < lines.length; i++) {
+                if (!lines[i]) continue;
+                const values = lines[i].split(',');
+                const rowObject = {};
+                headers.forEach((header, index) => {
+                    rowObject[header] = values[index] ? values[index].trim() : '';
+                });
+                rows.push(rowObject);
+            }
+            return rows;
+        }
 
-        async function processCsvData(data) {
-            const appId = firebaseConfig.projectId;
-            const batch = writeBatch(db);
-            const transactionsRef = collection(db, `artifacts/${appId}/public/data/transactions`);
-            let successCount = 0;
-            let errorCount = 0;
-            const errors = [];
+        async function processCsvData(data) {
+            const appId = firebaseConfig.projectId;
+            const batch = writeBatch(db);
+            const transactionsRef = collection(db, `artifacts/${appId}/public/data/transactions`);
+            let successCount = 0;
+            let errorCount = 0;
+            const errors = [];
+            
+            // لیست فیلدهایی که باید عدد باشند
+            const numericFields = ['userid', 'currency_amount', 'crypto_total_usdt', 'currency_price', 'Cost_Basis', 'Network Wage', 'ActualNetwork Wage', 'Fix Wage', 'Vip Amount', 'Voucher Amount', 'NetProfit'];
+            
+            data.forEach((row, index) => {
+                try {
+                    const newTxData = {};
+                    // تبدیل تمام مقادیر خام به آبجکت اولیه
+                    for(const key in row) {
+                        if (row[key] !== '' && row[key] !== null && row[key] !== undefined) {
+                            if (numericFields.includes(key)) {
+                                newTxData[key] = parseFloat(row[key]) || 0;
+                            } else {
+                                newTxData[key] = row[key];
+                            }
+                        }
+                    }
 
-            const numericFields = ['userid', 'currency_amount', 'crypto_total_usdt', 'currency_price', 'Cost_Basis', 'Network Wage', 'ActualNetwork Wage', 'Fix Wage', 'Vip Amount', 'Voucher Amount', 'NetProfit'];
-            
-            data.forEach((row, index) => {
-                try {
-                    const newTxData = {};
-                    Object.keys(row).forEach(key => {
-                        if (row[key] === '' || row[key] === null || row[key] === undefined) return;
-                        if (numericFields.includes(key)) {
-                            newTxData[key] = parseFloat(row[key]);
-                        } else if (key === 'orderdate') {
-                            // Assuming format YYYY/MM/DD HH:mm:ss or similar
-                            newTxData[key] = Timestamp.fromDate(new Date(row[key]));
-                        } else if (key === 'Is Crypto?') {
-                            newTxData[key] = row[key].toLowerCase() === 'true';
-                        } else {
-                            newTxData[key] = row[key];
-                        }
-                    });
-                    
-                    if (!newTxData.orderid || !newTxData.orderdate) {
-                        throw new Error("orderid and orderdate are required.");
-                    }
+                    if (!newTxData.orderid || !row.orderdate) {
+                        throw new Error("orderid and orderdate are required.");
+                    }
+                    newTxData.orderdate = Timestamp.fromDate(new Date(row.orderdate));
+                    newTxData['Is Crypto?'] = newTxData['Is Crypto?']?.toLowerCase() === 'true';
 
-                    newTxData.createdAt = serverTimestamp();
-                    newTxData.creatorId = currentUser.uid;
-                    newTxData.importSource = 'csv';
+                    // --- بخش محاسباتی جدید ---
+                    const currencyAmount = newTxData.currency_amount || 0;
+                    const currencyPrice = newTxData.currency_price || 0;
+                    const networkWage = newTxData['Network Wage'] || 0;
+                    const fixWage = newTxData['Fix Wage'] || 0;
+                    const vipAmount = newTxData['Vip Amount'] || 0;
+                    const voucherAmount = newTxData['Voucher Amount'] || 0;
+                    const networkWageToman = networkWage * currencyPrice;
 
-                    const docRef = doc(transactionsRef); // Auto-generate ID
-                    batch.set(docRef, newTxData);
-                    successCount++;
+                    if (newTxData.services_type === 'sell') { // خرید از مشتری
+                        newTxData.Total_Amount = (currencyAmount * currencyPrice) - fixWage - vipAmount - networkWageToman + voucherAmount;
+                    } else { // فروش به مشتری (buy)
+                        newTxData.Total_Amount = (currencyAmount * currencyPrice) + fixWage + vipAmount + networkWageToman - voucherAmount;
+                    }
+                    
+                    // هزینه تمام شده و سود خالص را به تابع اصلی می‌سپاریم و اینجا آنها را خالی می‌گذاریم
+                    newTxData.Cost_Basis = 0;
+                    newTxData.NetProfit = 0;
+                    newTxData.costBasisStatus = 'pending_import'; // یک وضعیت موقت برای پردازش اولیه
 
-                } catch (e) {
-                    errorCount++;
-                    errors.push(`ردیف ${index + 2}: ${e.message}`);
-                }
-            });
+                    // افزودن متادیتا
+                    newTxData.createdAt = serverTimestamp();
+                    newTxData.creatorId = currentUser.uid;
+                    newTxData.importSource = 'csv';
 
-            loadingText.textContent = `در حال ثبت ${successCount} تراکنش در پایگاه داده...`;
-            await batch.commit();
+                    const docRef = doc(transactionsRef); // ساخت آیدی خودکار
+                    batch.set(docRef, newTxData);
+                    successCount++;
 
-            loadingOverlay.style.display = 'none';
+                } catch (e) {
+                    errorCount++;
+                    errors.push(`ردیف ${index + 2}: ${e.message}`);
+                }
+            });
 
-            let reportHtml = `<p class="text-green-400 text-lg">تعداد ${successCount} تراکنش با موفقیت ثبت شد.</p>`;
-            if (errorCount > 0) {
-                reportHtml += `<p class="text-red-400 text-lg mt-4">تعداد ${errorCount} تراکنش با خطا مواجه شد:</p>`;
-                reportHtml += `<ul class="list-disc list-inside mt-2 text-red-300 text-sm max-h-60 overflow-y-auto">${errors.map(e => `<li>${e}</li>`).join('')}</ul>`;
-            }
-            showModalMessage('گزارش ورود دسته‌ای', reportHtml);
-        }
+            if (successCount > 0) {
+                loadingText.textContent = `در حال ثبت ${successCount} تراکنش در پایگاه داده...`;
+                await batch.commit();
+            }
+
+            let reportHtml = `<p class="text-green-400 text-lg">تعداد ${successCount} تراکنش با موفقیت برای پردازش اولیه ثبت شد.</p>`;
+            if (errorCount > 0) {
+                reportHtml += `<p class="text-red-400 text-lg mt-4">تعداد ${errorCount} تراکنش با خطا مواجه شد:</p>`;
+                reportHtml += `<ul class="list-disc list-inside mt-2 text-red-300 text-sm max-h-60 overflow-y-auto">${errors.map(e => `<li>${e}</li>`).join('')}</ul>`;
+            }
+            showModalMessage('گزارش ورود دسته‌ای', reportHtml);
+        }
 
         // --- AUTHENTICATION FLOW ---
         function handleLogin(e) {
