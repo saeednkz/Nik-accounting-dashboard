@@ -861,119 +861,119 @@
         }
         
         // --- DATA PROCESSING ---
-   async function processAllTransactionsForPools() {
-    if (isProcessingPools) return;
-    isProcessingPools = true;
+async function processAllTransactionsForPools() {
+            if (isProcessingPools) return;
+            isProcessingPools = true;
 
-    try {
-        const localTransactions = JSON.parse(JSON.stringify(ALL_TRANSACTIONS));
-        const sortedTransactions = localTransactions.sort((a, b) => new Date(a.orderdate) - new Date(b.orderdate));
-        
-        const updatesBatch = writeBatch(db);
-        let updatesNeeded = false;
-        
-        const fifoPools = {};
-        const pendingSalesQueues = {}; // صف انتظار برای هر ارز
+            try {
+                const localTransactions = JSON.parse(JSON.stringify(ALL_TRANSACTIONS));
+                const sortedTransactions = localTransactions.sort((a, b) => new Date(a.orderdate) - new Date(b.orderdate));
+                
+                const updatesBatch = writeBatch(db);
+                let updatesNeeded = false;
+                
+                const fifoPools = {};
+                const pendingSalesQueues = {};
+                const transactionLogs = {}; // آبجکت جدید برای نگهداری لاگ‌ها
 
-        const allCurrencySlugs = [...new Set(sortedTransactions.map(t => t.currencie_slug).filter(Boolean))];
-        allCurrencySlugs.forEach(slug => {
-            fifoPools[slug] = []; // لایه‌های خرید
-            pendingSalesQueues[slug] = []; // تراکنش‌های فروش در انتظار
-        });
+                const allCurrencySlugs = [...new Set(sortedTransactions.map(t => t.currencie_slug).filter(Boolean))];
+                allCurrencySlugs.forEach(slug => {
+                    fifoPools[slug] = [];
+                    pendingSalesQueues[slug] = [];
+                    transactionLogs[slug] = []; // مقداردهی اولیه لاگ برای هر ارز
+                });
 
-        for (const t of sortedTransactions) {
-            const slug = t.currencie_slug;
-            if (!slug) continue;
+                for (const t of sortedTransactions) {
+                    const slug = t.currencie_slug;
+                    if (!slug) continue;
 
-            const currentPool = fifoPools[slug];
-            const currentQueue = pendingSalesQueues[slug];
+                    const currentPool = fifoPools[slug];
+                    const currentQueue = pendingSalesQueues[slug];
+                    const currentLog = transactionLogs[slug];
 
-            if (t.services_type === 'buy') { // فروش به مشتری
-                // همیشه ابتدا تراکنش فروش را به صف اضافه کن
-                currentQueue.push(t);
-            } else { // خرید از مشتری/تامین‌کننده
-                // خرید جدید را به استخر اضافه کن
-                currentPool.push({ qty: t.currency_amount, cost: t.currency_price });
-                if (t.NetProfit !== 0 || t.costBasisStatus !== 'settled') {
-                    updatesBatch.update(doc(db, `artifacts/${firebaseConfig.projectId}/public/data/transactions`, t.id), { NetProfit: 0, costBasisStatus: 'settled', Cost_Basis: t.currency_price });
-                    updatesNeeded = true;
-                }
-            }
+                    if (t.services_type === 'buy') {
+                        currentQueue.push(t);
+                    } else {
+                        currentPool.push({ qty: t.currency_amount, cost: t.currency_price });
+                        // افزودن خرید به لاگ
+                        currentLog.push({ date: t.orderdate, amount: t.currency_amount, orderid: t.orderid, type: 'واریز', rate: t.currency_price });
+                        if (t.NetProfit !== 0 || t.costBasisStatus !== 'settled') {
+                            updatesBatch.update(doc(db, `artifacts/${firebaseConfig.projectId}/public/data/transactions`, t.id), { NetProfit: 0, costBasisStatus: 'settled', Cost_Basis: t.currency_price });
+                            updatesNeeded = true;
+                        }
+                    }
 
-            // --- بخش کلیدی جدید: پردازش صف انتظار ---
-            // بعد از هر تراکنش (چه خرید و چه فروش)، سعی کن صف را پردازش کنی
-            let queueChanged = true;
-            while(queueChanged && currentQueue.length > 0) {
-                queueChanged = false;
-                const availableQty = currentPool.reduce((sum, layer) => sum + layer.qty, 0);
-                const nextSale = currentQueue[0]; // اولین فروش در صف
+                    let queueChanged = true;
+                    while(queueChanged && currentQueue.length > 0) {
+                        queueChanged = false;
+                        const availableQty = currentPool.reduce((sum, layer) => sum + layer.qty, 0);
+                        const nextSale = currentQueue[0];
 
-                if (availableQty >= nextSale.currency_amount) {
-                    // موجودی کافی است، این فروش را پردازش کن
-                    let saleAmount = nextSale.currency_amount;
-                    let totalCostForThisSale = 0;
-                    
-                    for (const layer of currentPool) {
-                        if (saleAmount <= 0) break;
-                        const amountFromThisLayer = Math.min(saleAmount, layer.qty);
-                        totalCostForThisSale += amountFromThisLayer * layer.cost;
-                        layer.qty -= amountFromThisLayer;
-                        saleAmount -= amountFromThisLayer;
-                    }
+                        if (availableQty >= nextSale.currency_amount) {
+                            let saleAmount = nextSale.currency_amount;
+                            let totalCostForThisSale = 0;
+                            for (const layer of currentPool) {
+                                if (saleAmount <= 0) break;
+                                const amountFromThisLayer = Math.min(saleAmount, layer.qty);
+                                totalCostForThisSale += amountFromThisLayer * layer.cost;
+                                layer.qty -= amountFromThisLayer;
+                                saleAmount -= amountFromThisLayer;
+                            }
 
-                    while (currentPool.length > 0 && currentPool[0].qty <= 0) {
-                        currentPool.shift();
-                    }
+                            while (currentPool.length > 0 && currentPool[0].qty <= 0) {
+                                currentPool.shift();
+                            }
 
-                    const newCostBasis = nextSale.currency_amount > 0 ? totalCostForThisSale / nextSale.currency_amount : 0;
-                    const actualNetworkWageToman = (nextSale.ActualNetwork_Wage || 0) * nextSale.currency_price;
-                    const newNetProfit = nextSale.Total_Amount - (totalCostForThisSale + actualNetworkWageToman);
+                            const newCostBasis = nextSale.currency_amount > 0 ? totalCostForThisSale / nextSale.currency_amount : 0;
+                            const actualNetworkWageToman = (nextSale['ActualNetwork Wage'] || 0) * nextSale.currency_price;
+                            const newNetProfit = nextSale.Total_Amount - (totalCostForThisSale + actualNetworkWageToman);
 
-                    if (nextSale.Cost_Basis !== newCostBasis || nextSale.NetProfit !== newNetProfit || nextSale.costBasisStatus !== 'settled') {
-                        updatesBatch.update(doc(db, `artifacts/${firebaseConfig.projectId}/public/data/transactions`, nextSale.id), {
-                            costBasisStatus: 'settled',
-                            Cost_Basis: newCostBasis,
-                            NetProfit: newNetProfit
-                        });
-                        updatesNeeded = true;
-                    }
+                            // افزودن فروش به لاگ
+                            currentLog.push({ date: nextSale.orderdate, amount: nextSale.currency_amount, orderid: nextSale.orderid, type: 'برداشت', rate: newCostBasis });
+                            
+                            if (nextSale.Cost_Basis !== newCostBasis || nextSale.NetProfit !== newNetProfit || nextSale.costBasisStatus !== 'settled') {
+                                updatesBatch.update(doc(db, `artifacts/${firebaseConfig.projectId}/public/data/transactions`, nextSale.id), { costBasisStatus: 'settled', Cost_Basis: newCostBasis, NetProfit: newNetProfit });
+                                updatesNeeded = true;
+                            }
+                            currentQueue.shift();
+                            queueChanged = true;
+                        }
+                    }
+                }
 
-                    currentQueue.shift(); // تراکنش پردازش شده را از صف حذف کن
-                    queueChanged = true; // چون صف تغییر کرده، دوباره حلقه را چک کن
-                }
-            }
-        }
+                for(const slug of allCurrencySlugs) {
+                    for(const remainingSale of pendingSalesQueues[slug]) {
+                        if (remainingSale.costBasisStatus !== 'pending') {
+                            updatesBatch.update(doc(db, `artifacts/${firebaseConfig.projectId}/public/data/transactions`, remainingSale.id), { costBasisStatus: 'pending', Cost_Basis: 0, NetProfit: 0 });
+                            updatesNeeded = true;
+                        }
+                    }
+                }
+                
+                currencyPools = {};
+                for(const slug of allCurrencySlugs) {
+                    const finalPool = fifoPools[slug];
+                    const finalPoolQty = finalPool.reduce((sum, layer) => sum + layer.qty, 0);
+                    const finalPoolValue = finalPool.reduce((sum, layer) => sum + (layer.qty * layer.cost), 0);
+                    const finalAvgCost = finalPoolQty > 0 ? finalPoolValue / finalPoolQty : 0;
+                    // انتساب لاگ ساخته شده به آبجکت نهایی
+                    currencyPools[slug] = { 
+                        quantity: finalPoolQty, 
+                        weightedAvgCost: finalAvgCost, 
+                        log: transactionLogs[slug] 
+                    };
+                }
 
-        // در پایان، اگر تراکنشی در صف باقی مانده، یعنی موجودی کافی نبوده و باید pending بماند
-        for(const slug of allCurrencySlugs) {
-            for(const remainingSale of pendingSalesQueues[slug]) {
-                if (remainingSale.costBasisStatus !== 'pending') {
-                    updatesBatch.update(doc(db, `artifacts/${firebaseConfig.projectId}/public/data/transactions`, remainingSale.id), { costBasisStatus: 'pending', Cost_Basis: 0, NetProfit: 0 });
-                    updatesNeeded = true;
-                }
-            }
-        }
-        
-        // آپدیت وضعیت نهایی استخرها برای نمایش در UI
-        currencyPools = {};
-        for(const slug of allCurrencySlugs) {
-            const finalPool = fifoPools[slug];
-            const finalPoolQty = finalPool.reduce((sum, layer) => sum + layer.qty, 0);
-            const finalPoolValue = finalPool.reduce((sum, layer) => sum + (layer.qty * layer.cost), 0);
-            const finalAvgCost = finalPoolQty > 0 ? finalPoolValue / finalPoolQty : 0;
-            currencyPools[slug] = { quantity: finalPoolQty, weightedAvgCost: finalAvgCost, log: [] };
-        }
-
-        if (updatesNeeded) {
-            console.log("Committing final batch updates...");
-            await updatesBatch.commit();
-        }
-    } catch (error) {
-        console.error("Error in processAllTransactionsForPools:", error);
-    } finally {
-        isProcessingPools = false;
-    }
-}
+                if (updatesNeeded) {
+                    console.log("Committing final batch updates...");
+                    await updatesBatch.commit();
+                }
+            } catch (error) {
+                console.error("Error in processAllTransactionsForPools:", error);
+            } finally {
+                isProcessingPools = false;
+            }
+        }
 
         // --- UI & PAGE LOGIC ---
         let salesProfitChart, profitCompositionChart;
