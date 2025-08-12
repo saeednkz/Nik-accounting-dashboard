@@ -1125,34 +1125,43 @@
             showModalMessage('تراکنش‌های در انتظار تسویه', tableHtml);
         }
 
-        function showDetailsModal(t) {
-            const detailItem = (label, value, extraClass = '') => `<div class="py-2.5 grid grid-cols-3 gap-4 border-b border-slate-700/30"><dt class="text-sm text-slate-400">${label}</dt><dd class="col-span-2 text-sm text-white font-mono break-words ${extraClass}">${value}</dd></div>`;
-            
-            const networkWageCrypto = t.Network_Wage || 0;
-            const actualNetworkWageCrypto = t.ActualNetwork_Wage || 0;
-            const price = t.currency_price || 0;
-            const slug = (t.currencie_slug || '').toUpperCase();
+       function showDetailsModal(t) {
+            const detailItem = (label, value, extraClass = '') => `<div class="py-2.5 grid grid-cols-3 gap-4 border-b border-slate-700/30"><dt class="text-sm text-slate-400">${label}</dt><dd class="col-span-2 text-sm text-white font-mono break-words ${extraClass}">${value}</dd></div>`;
+            
+            // استفاده از براکت برای خواندن پراپرتی‌هایی که اسمشان فاصله دارد
+            const networkWageCrypto = t['Network Wage'] || 0;
+            const actualNetworkWageCrypto = t['ActualNetwork Wage'] || 0;
+            const fixWage = t['Fix Wage'] || 0;
+            const vipAmount = t['Vip Amount'] || 0;
+            const voucherAmount = t['Voucher Amount'] || 0;
+            const vouchersCode = t['Vouchers Code'] || '---';
+            const cryptoTotalUsdt = t.crypto_total_usdt || 0;
 
-            const networkWageToman = networkWageCrypto * price;
-            const actualNetworkWageToman = actualNetworkWageCrypto * price;
+            const price = t.currency_price || 0;
+            const slug = (t.currencie_slug || '').toUpperCase();
 
-            const networkWageDisplay = `${formatCurrency(networkWageCrypto, 6)} ${slug} <span class="text-slate-400 font-sans">(${formatCurrency(networkWageToman, 0)} تومان)</span>`;
-            const actualNetworkWageDisplay = `${formatCurrency(actualNetworkWageCrypto, 6)} ${slug} <span class="text-slate-400 font-sans">(${formatCurrency(actualNetworkWageToman, 0)} تومان)</span>`;
-            
-            const usdtEquivalentDisplay = typeof t.usdt_equivalent_at_creation === 'number' ? `${formatCurrency(t.usdt_equivalent_at_creation, 2)} USDT` : 'محاسبه نشده';
+            const networkWageToman = networkWageCrypto * price;
+            const actualNetworkWageToman = actualNetworkWageCrypto * price;
 
-            let userInfoHtml = '';
-            if (t.transaction_source === 'supplier') {
-                const supplier = ALL_SUPPLIERS.find(s => s.id === t.supplierId);
-                const supplierName = supplier ? supplier.name : 'تامین‌کننده حذف شده';
-                userInfoHtml = `<h4 class="text-lg font-semibold text-cyan-400 mb-2">اطلاعات تامین‌کننده</h4><dl>${detailItem('نام تامین‌کننده', `<span class="font-sans">${supplierName}</span>`)}</dl>`;
-            } else {
-                userInfoHtml = `<h4 class="text-lg font-semibold text-cyan-400 mb-2">اطلاعات کاربر</h4><dl>${detailItem('ID کاربر', t.userid)}${detailItem('نام', `<span class="font-sans">${t.first_name}</span>`)}${detailItem('نام خانوادگی', `<span class="font-sans">${t.last_name}</span>`)}${detailItem('موبایل', t.Mobile)}${detailItem('ایمیل', t.Email)}</dl>`;
-            }
+            const networkWageDisplay = `${formatCurrency(networkWageCrypto, 6)} ${slug} <span class="text-slate-400 font-sans">(${formatCurrency(networkWageToman, 0)} تومان)</span>`;
+            const actualNetworkWageDisplay = `${formatCurrency(actualNetworkWageCrypto, 6)} ${slug} <span class="text-slate-400 font-sans">(${formatCurrency(actualNetworkWageToman, 0)} تومان)</span>`;
+            
+            const usdtEquivalentDisplay = typeof t.usdt_equivalent_at_creation === 'number' && t.usdt_equivalent_at_creation > 0
+                ? `${formatCurrency(t.usdt_equivalent_at_creation, 2)} USDT`
+                : 'محاسبه نشده';
 
-            const bodyHtml = `<div class="grid grid-cols-1 md:grid-cols-2 gap-x-8"><div><h4 class="text-lg font-semibold text-cyan-400 mb-2">اطلاعات سفارش</h4><dl>${detailItem('ID سفارش', t.orderid)}${detailItem('تاریخ سفارش', new Date(t.orderdate).toLocaleString('fa-IR', { timeZone: 'Asia/Tehran' }))}${detailItem('اسلاگ سرویس', t.service_slug)}${detailItem('عنوان دسته', t.categories_title)}${detailItem('نوع سرویس', t.services_type === 'buy' ? 'فروش به مشتری' : 'خرید از مشتری')}${detailItem('کریپتو؟', t['Is Crypto?'] ? 'بله' : 'خیر')}${detailItem('کد تخفیف', t['Vouchers Code'] || '---')}${detailItem('توضیحات', `<p class="text-xs leading-relaxed font-sans">${t.description || '---'}</p>`)}</dl></div><div>${userInfoHtml}<h4 class="text-lg font-semibold text-cyan-400 mt-6 mb-2">آدرس‌ها و TXID</h4><dl>${detailItem('آدرس مبدا', t['Source Wallet Address'])}${detailItem('آدرس مقصد', t['Destination Wallet Address'])}${detailItem('TXID', t.Txid)}</dl></div></div><div class="mt-6"><h4 class="text-lg font-semibold text-cyan-400 mb-2">جزئیات مالی</h4><div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"><div class="glass-card p-4 rounded-lg">${detailItem('نام ارز', `<span class="font-sans">${t.currency}</span> (${t.currencie_slug})`)}</div><div class="glass-card p-4 rounded-lg">${detailItem('مقدار ارز', formatCurrency(t.currency_amount, 8))}</div><div class="glass-card p-4 rounded-lg">${detailItem('نرخ ارز', formatCurrency(t.currency_price,0))}</div><div class="glass-card p-4 rounded-lg">${detailItem('ارزش تومانی', formatCurrency(t.crypto_total_usdt,0))}</div><div class="glass-card p-4 rounded-lg">${detailItem('معادل تتری (نرخ استخر در زمان ثبت)', usdtEquivalentDisplay)}</div><div class="glass-card p-4 rounded-lg">${detailItem('کارمزد ثابت', formatCurrency(t.Fix_Wage,0))}</div><div class="glass-card p-4 rounded-lg">${detailItem('کارمزد VIP', formatCurrency(t.Vip_Amount,0))}</div><div class="glass-card p-4 rounded-lg">${detailItem('مبلغ ووچر', formatCurrency(t.Voucher_Amount,0))}</div><div class="glass-card p-4 rounded-lg">${detailItem('کارمزد شبکه (دریافتی)', networkWageDisplay)}</div><div class="glass-card p-4 rounded-lg">${detailItem('کارمزد شبکه (واقعی)', actualNetworkWageDisplay)}</div><div class="glass-card p-4 rounded-lg bg-slate-900/50">${detailItem('قیمت تمام شده (فی واحد)', formatCurrency(t.Cost_Basis,0), 'text-amber-400')}</div><div class="glass-card p-4 rounded-lg bg-slate-900/50">${detailItem('مبلغ کل', formatCurrency(t.Total_Amount,0), 'text-cyan-400 font-bold')}</div><div class="glass-card p-4 rounded-lg bg-slate-900/50">${detailItem('سود/زیان خالص', formatCurrency(t.NetProfit,0), t.NetProfit >= 0 ? 'text-green-400 font-bold' : 'text-red-400 font-bold')}</div></div></div>`;
-            showModalMessage('جزئیات کامل تراکنش', bodyHtml);
-        }
+            let userInfoHtml = '';
+            if (t.transaction_source === 'supplier') {
+                const supplier = ALL_SUPPLIERS.find(s => s.id === t.supplierId);
+                const supplierName = supplier ? supplier.name : 'تامین‌کننده حذف شده';
+                userInfoHtml = `<h4 class="text-lg font-semibold text-cyan-400 mb-2">اطلاعات تامین‌کننده</h4><dl>${detailItem('نام تامین‌کننده', `<span class="font-sans">${supplierName}</span>`)}</dl>`;
+            } else {
+                userInfoHtml = `<h4 class="text-lg font-semibold text-cyan-400 mb-2">اطلاعات کاربر</h4><dl>${detailItem('ID کاربر', t.userid || '---')}${detailItem('نام', `<span class="font-sans">${t.first_name || ''}</span>`)}${detailItem('نام خانوادگی', `<span class="font-sans">${t.last_name || ''}</span>`)}${detailItem('موبایل', t.Mobile || '---')}${detailItem('ایمیل', t.Email || '---')}</dl>`;
+            }
+
+            const bodyHtml = `<div class="grid grid-cols-1 md:grid-cols-2 gap-x-8"><div><h4 class="text-lg font-semibold text-cyan-400 mb-2">اطلاعات سفارش</h4><dl>${detailItem('ID سفارش', t.orderid)}${detailItem('تاریخ سفارش', new Date(t.orderdate).toLocaleString('fa-IR', { timeZone: 'Asia/Tehran' }))}${detailItem('اسلاگ سرویس', t.service_slug || '---')}${detailItem('عنوان دسته', t.categories_title || '---')}${detailItem('نوع سرویس', t.services_type === 'buy' ? 'فروش به مشتری' : 'خرید از مشتری')}${detailItem('کریپتو؟', t['Is Crypto?'] ? 'بله' : 'خیر')}${detailItem('کد تخفیف', vouchersCode)}${detailItem('توضیحات', `<p class="text-xs leading-relaxed font-sans">${t.description || '---'}</p>`)}</dl></div><div>${userInfoHtml}<h4 class="text-lg font-semibold text-cyan-400 mt-6 mb-2">آدرس‌ها و TXID</h4><dl>${detailItem('آدرس مبدا', t['Source Wallet Address'] || '---')}${detailItem('آدرس مقصد', t['Destination Wallet Address'] || '---')}${detailItem('TXID', t.Txid || '---')}</dl></div></div><div class="mt-6"><h4 class="text-lg font-semibold text-cyan-400 mb-2">جزئیات مالی</h4><div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"><div class="glass-card p-4 rounded-lg">${detailItem('نام ارز', `<span class="font-sans">${t.currency}</span> (${t.currencie_slug})`)}</div><div class="glass-card p-4 rounded-lg">${detailItem('مقدار ارز', formatCurrency(t.currency_amount, 8))}</div><div class="glass-card p-4 rounded-lg">${detailItem('نرخ ارز', formatCurrency(t.currency_price,0))}</div><div class="glass-card p-4 rounded-lg">${detailItem('ارزش تومانی', formatCurrency(cryptoTotalUsdt,0))}</div><div class="glass-card p-4 rounded-lg">${detailItem('معادل تتری (نرخ استخر در زمان ثبت)', usdtEquivalentDisplay)}</div><div class="glass-card p-4 rounded-lg">${detailItem('کارمزد ثابت', formatCurrency(fixWage,0))}</div><div class="glass-card p-4 rounded-lg">${detailItem('کارمزد VIP', formatCurrency(vipAmount,0))}</div><div class="glass-card p-4 rounded-lg">${detailItem('مبلغ ووچر', formatCurrency(voucherAmount,0))}</div><div class="glass-card p-4 rounded-lg">${detailItem('کارمزد شبکه (دریافتی)', networkWageDisplay)}</div><div class="glass-card p-4 rounded-lg">${detailItem('کارمزد شبکه (واقعی)', actualNetworkWageDisplay)}</div><div class="glass-card p-4 rounded-lg bg-slate-900/50">${detailItem('قیمت تمام شده (فی واحد)', formatCurrency(t.Cost_Basis,0), 'text-amber-400')}</div><div class="glass-card p-4 rounded-lg bg-slate-900/50">${detailItem('مبلغ کل', formatCurrency(t.Total_Amount,0), 'text-cyan-400 font-bold')}</div><div class="glass-card p-4 rounded-lg bg-slate-900/50">${detailItem('سود/زیان خالص', formatCurrency(t.NetProfit,0), t.NetProfit >= 0 ? 'text-green-400 font-bold' : 'text-red-400 font-bold')}</div></div></div>`;
+            showModalMessage('جزئیات کامل تراکنش', bodyHtml);
+        }
 
         function showHistoryModal(t) {
             let historyHtml = '<div class="space-y-4">';
@@ -1825,7 +1834,7 @@
             return rows;
         }
 
-        async function processCsvData(data) {
+      async function processCsvData(data) {
             const appId = firebaseConfig.projectId;
             const batch = writeBatch(db);
             const transactionsRef = collection(db, `artifacts/${appId}/public/data/transactions`);
@@ -1833,13 +1842,11 @@
             let errorCount = 0;
             const errors = [];
             
-            // لیست فیلدهایی که باید عدد باشند
             const numericFields = ['userid', 'currency_amount', 'crypto_total_usdt', 'currency_price', 'Cost_Basis', 'Network Wage', 'ActualNetwork Wage', 'Fix Wage', 'Vip Amount', 'Voucher Amount', 'NetProfit'];
             
             data.forEach((row, index) => {
                 try {
                     const newTxData = {};
-                    // تبدیل تمام مقادیر خام به آبجکت اولیه
                     for(const key in row) {
                         if (row[key] !== '' && row[key] !== null && row[key] !== undefined) {
                             if (numericFields.includes(key)) {
@@ -1850,13 +1857,11 @@
                         }
                     }
 
-                    if (!newTxData.orderid || !row.orderdate) {
-                        throw new Error("orderid and orderdate are required.");
-                    }
+                    if (!newTxData.orderid || !row.orderdate) throw new Error("orderid and orderdate are required.");
                     newTxData.orderdate = Timestamp.fromDate(new Date(row.orderdate));
                     newTxData['Is Crypto?'] = newTxData['Is Crypto?']?.toLowerCase() === 'true';
 
-                    // --- بخش محاسباتی جدید ---
+                    // --- بخش محاسباتی کامل شده ---
                     const currencyAmount = newTxData.currency_amount || 0;
                     const currencyPrice = newTxData.currency_price || 0;
                     const networkWage = newTxData['Network Wage'] || 0;
@@ -1865,23 +1870,29 @@
                     const voucherAmount = newTxData['Voucher Amount'] || 0;
                     const networkWageToman = networkWage * currencyPrice;
 
+                    newTxData.crypto_total_usdt = currencyAmount * currencyPrice;
+
                     if (newTxData.services_type === 'sell') { // خرید از مشتری
-                        newTxData.Total_Amount = (currencyAmount * currencyPrice) - fixWage - vipAmount - networkWageToman + voucherAmount;
+                        newTxData.Total_Amount = newTxData.crypto_total_usdt - fixWage - vipAmount - networkWageToman + voucherAmount;
                     } else { // فروش به مشتری (buy)
-                        newTxData.Total_Amount = (currencyAmount * currencyPrice) + fixWage + vipAmount + networkWageToman - voucherAmount;
+                        newTxData.Total_Amount = newTxData.crypto_total_usdt + fixWage + vipAmount + networkWageToman - voucherAmount;
                     }
                     
-                    // هزینه تمام شده و سود خالص را به تابع اصلی می‌سپاریم و اینجا آنها را خالی می‌گذاریم
+                    const usdtPoolCost = currencyPools['tether']?.weightedAvgCost || 0;
+                    if (usdtPoolCost > 0) {
+                        newTxData.usdt_equivalent_at_creation = newTxData.crypto_total_usdt / usdtPoolCost;
+                    } else {
+                        newTxData.usdt_equivalent_at_creation = 0;
+                    }
+
                     newTxData.Cost_Basis = 0;
                     newTxData.NetProfit = 0;
-                    newTxData.costBasisStatus = 'pending_import'; // یک وضعیت موقت برای پردازش اولیه
-
-                    // افزودن متادیتا
+                    newTxData.costBasisStatus = 'pending_import';
                     newTxData.createdAt = serverTimestamp();
                     newTxData.creatorId = currentUser.uid;
                     newTxData.importSource = 'csv';
 
-                    const docRef = doc(transactionsRef); // ساخت آیدی خودکار
+                    const docRef = doc(transactionsRef);
                     batch.set(docRef, newTxData);
                     successCount++;
 
