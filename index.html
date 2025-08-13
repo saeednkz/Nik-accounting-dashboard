@@ -76,14 +76,6 @@
         .datepicker-plot-area .datepicker-calendar .day-items span:hover { background-color: #334155 !important; }
         .datepicker-plot-area .datepicker-calendar .day-items span.selected { background-color: #0ea5e9 !important; color: #fff !important; }
         .datepicker-plot-area .datepicker-navigator .pwt-btn-next, .datepicker-plot-area .datepicker-navigator .pwt-btn-prev { color: #94a3b8 !important; }
-    /* ========== کد زیر را اضافه کنید ========== */
-.progress-container {
-    transition: all 0.3s ease;
-}
-.progress-container .bg-cyan-500 {
-    transition: width 0.5s ease-out;
-}
-/* ======================================= */
     </style>
 </head>
 <body class="text-slate-300">
@@ -141,12 +133,6 @@
                     <svg class="h-6 w-6 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m-7.5-2.962a3.75 3.75 0 015.962 0zM12 6.75a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z" /></svg>
                     <span class="mr-4 opacity-0 max-w-0 group-hover:opacity-100 group-hover:max-w-full transition-all duration-300 whitespace-nowrap overflow-hidden">تامین‌کنندگان</span>
                 </a>
-                <a href="#" id="nav-targets" class="nav-link flex items-center p-3 rounded-lg text-slate-400 hover:bg-slate-700/50">
-    <svg class="h-6 w-6 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M10.125 2.25h-4.5c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125v-9M10.125 2.25h.375a9 9 0 019 9v.375M10.125 2.25c3.866 0 7.5 3.134 7.5 7.5v.375m-7.5-7.875L7.5 15l4.5-3L15 15l-2.625-7.875" />
-    </svg>
-    <span class="mr-4 opacity-0 max-w-0 group-hover:opacity-100 group-hover:max-w-full transition-all duration-300 whitespace-nowrap overflow-hidden">مدیریت اهداف</span>
-</a>
                  <a href="#" id="nav-users" class="nav-link flex items-center p-3 rounded-lg text-slate-400 hover:bg-slate-700/50">
                     <svg class="h-6 w-6 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-4.663M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0z" /></svg>
                     <span class="mr-4 opacity-0 max-w-0 group-hover:opacity-100 group-hover:max-w-full transition-all duration-300 whitespace-nowrap overflow-hidden">مدیریت کاربران</span>
@@ -174,6 +160,7 @@
                             <select id="interval-type-filter" class="bg-slate-800/50 border border-slate-700 text-slate-300 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block w-full p-2.5"></select>
                             <select id="year-filter" class="bg-slate-800/50 border border-slate-700 text-slate-300 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block w-full p-2.5"></select>
                             <select id="period-filter" class="bg-slate-800/50 border border-slate-700 text-slate-300 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block w-full p-2.5"></select>
+                            <input type="text" id="daily-date-picker" placeholder="انتخاب روز" class="persian-datepicker bg-slate-800/50 border border-slate-700 text-slate-300 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block w-full p-2.5" style="display: none;">
                         </div>
                     </header>
                     <div id="kpi-grid" class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-5 gap-4 mb-6"></div>
@@ -363,15 +350,6 @@
                     </div>
                 </div>
             </div>
-            <div id="page-targets" class="page-content">
-    <div class="flex flex-col h-full">
-        <header class="flex-shrink-0 flex flex-wrap items-center justify-between gap-4 mb-6">
-            <h2 class="text-3xl font-bold text-slate-100">مدیریت اهداف KPI</h2>
-        </header>
-        <div id="targets-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            </div>
-    </div>
-</div>
         </main>
     </div>
 
@@ -427,7 +405,6 @@
         let ALL_SUPPLIERS = [];
         let currentUser = null;
         let authUser = null;
-        let KPI_TARGETS = {};
         
         let unsubscribeTransactions, unsubscribeUsers, unsubscribeRoles, unsubscribeSuppliers;
         let appInitialized = false;
@@ -527,7 +504,7 @@
                 setInterval(updateTime, 60000);
             }
 
-         function populateDashboardFilters() {
+          function populateDashboardFilters() {
     const currentJalaliYear = new persianDate().year();
     yearFilter.innerHTML = '';
     for (let year = 1397; year <= currentJalaliYear; year++) {
@@ -536,50 +513,90 @@
 
     intervalTypeFilter.innerHTML = `<option value="daily">روزانه</option><option value="monthly">ماهیانه</option><option value="quarterly">فصلی</option><option value="yearly">سالیانه</option>`;
 
-    const currentJalaliDate = new persianDate();
-    yearFilter.value = currentJalaliDate.year();
-    intervalTypeFilter.value = 'daily';
-    updatePeriodFilter();
+    // تنظیم پیش‌فرض روی ماه و سال جاری - منطقه زمانی تهران
+    const currentTehranDate = new persianDate();
+    yearFilter.value = currentTehranDate.year();
+    intervalTypeFilter.value = 'monthly'; // پیش‌فرض: ماهیانه
+
+    // فراخوانی آپدیت برای تنظیم صحیح فیلتر ماه
+    updatePeriodFilter(); 
+    periodFilter.value = currentTehranDate.month() - 1; // انتخاب ماه جاری
+
+    // مقداردهی اولیه تقویم روزانه
+    $('#daily-date-picker').persianDatepicker({
+        format: 'YYYY/MM/DD',
+        initialValue: true,
+        onSelect: () => updateDashboardView()
+    });
 }
 
-            function updatePeriodFilter() {
-                const intervalType = intervalTypeFilter.value;
-                periodFilter.innerHTML = '';
-                periodFilter.style.display = 'block';
-                if (intervalType === 'monthly') {
-                    JALALI_MONTHS.forEach((month, index) => { periodFilter.innerHTML += `<option value="${index}">${month}</option>`; });
-                } else if (intervalType === 'quarterly') {
-                    JALALI_QUARTERS.forEach((q, index) => { periodFilter.innerHTML += `<option value="${index}">${q}</option>`; });
-                } else {
-                    periodFilter.style.display = 'none';
-                }
-            }
+           function updatePeriodFilter() {
+    const intervalType = intervalTypeFilter.value;
+    const yearFilterEl = document.getElementById('year-filter');
+    const periodFilterEl = document.getElementById('period-filter');
+    const dailyPickerEl = document.getElementById('daily-date-picker');
 
-            function getSelectedDateRange() {
-                const jalaliYear = parseInt(yearFilter.value);
-                const interval = intervalTypeFilter.value;
-                const period = parseInt(periodFilter.value); 
-                let startDate, endDate;
+    periodFilterEl.innerHTML = '';
 
-                if (interval === 'yearly') {
-                    startDate = new persianDate([jalaliYear, 1, 1]).toDate();
-                    endDate = new persianDate([jalaliYear + 1, 1, 1]).toDate();
-                    endDate.setDate(endDate.getDate() - 1);
-                } else if (interval === 'quarterly') {
-                    const startMonth = period * 3 + 1;
-                    const endMonth = startMonth + 2;
-                    startDate = new persianDate([jalaliYear, startMonth, 1]).toDate();
-                    const endMonthDays = new persianDate([jalaliYear, endMonth, 1]).daysInMonth();
-                    endDate = new persianDate([jalaliYear, endMonth, endMonthDays]).toDate();
-                } else { // monthly
-                    const month = period + 1;
-                    startDate = new persianDate([jalaliYear, month, 1]).toDate();
-                    const endMonthDays = new persianDate([jalaliYear, month, 1]).daysInMonth();
-                    endDate = new persianDate([jalaliYear, month, endMonthDays]).toDate();
-                }
-                endDate.setHours(23, 59, 59, 999);
-                return { startDate, endDate };
-            }
+    if (intervalType === 'daily') {
+        yearFilterEl.style.display = 'none';
+        periodFilterEl.style.display = 'none';
+        dailyPickerEl.style.display = 'block';
+    } else {
+        yearFilterEl.style.display = 'block';
+        periodFilterEl.style.display = 'block';
+        dailyPickerEl.style.display = 'none';
+
+        if (intervalType === 'monthly') {
+            JALALI_MONTHS.forEach((month, index) => { periodFilterEl.innerHTML += `<option value="${index}">${month}</option>`; });
+        } else if (intervalType === 'quarterly') {
+            JALALI_QUARTERS.forEach((q, index) => { periodFilterEl.innerHTML += `<option value="${index}">${q}</option>`; });
+        } else { // yearly
+            periodFilterEl.style.display = 'none';
+        }
+    }
+}
+function getSelectedDateRange() {
+    const interval = intervalTypeFilter.value;
+    let startDate, endDate;
+
+    if (interval === 'daily') {
+        const dailyPicker = $('#daily-date-picker').data('datepicker');
+        if (dailyPicker && dailyPicker.getState().selected) {
+            const selectedUnix = dailyPicker.getState().selected.unixDate;
+            startDate = new Date(selectedUnix);
+            endDate = new Date(selectedUnix);
+        } else { // Fallback to today if nothing is selected
+            startDate = new Date();
+            endDate = new Date();
+        }
+        startDate.setHours(0, 0, 0, 0);
+        endDate.setHours(23, 59, 59, 999);
+    } else {
+        const jalaliYear = parseInt(yearFilter.value);
+        const period = parseInt(periodFilter.value);
+
+        if (interval === 'yearly') {
+            startDate = new persianDate([jalaliYear, 1, 1]).toDate();
+            const endYear = new persianDate([jalaliYear, 12, 1]);
+            endDate = new persianDate([jalaliYear, 12, endYear.daysInMonth()]).toDate();
+        } else if (interval === 'quarterly') {
+            const startMonth = period * 3 + 1;
+            const endMonth = startMonth + 2;
+            startDate = new persianDate([jalaliYear, startMonth, 1]).toDate();
+            const endMonthDate = new persianDate([jalaliYear, endMonth, 1]);
+            endDate = new persianDate([jalaliYear, endMonth, endMonthDate.daysInMonth()]).toDate();
+        } else { // monthly
+            const month = period + 1;
+            startDate = new persianDate([jalaliYear, month, 1]).toDate();
+            const endMonthDate = new persianDate([jalaliYear, month, 1]);
+            endDate = new persianDate([jalaliYear, month, endMonthDate.daysInMonth()]).toDate();
+        }
+        endDate.setHours(23, 59, 59, 999);
+    }
+
+    return { startDate, endDate };
+}
 
             function filterDashboardData() {
                 const { startDate, endDate } = getSelectedDateRange();
@@ -594,92 +611,65 @@
                 renderProfitCompositionChart(data);
             }
 
-        function renderKPIs(data) {
-    const kpiGrid = document.getElementById('kpi-grid');
-    if (!kpiGrid) return;
-    kpiGrid.innerHTML = '';
+            function renderKPIs(data) {
+                const kpiGrid = document.getElementById('kpi-grid');
+                if (!kpiGrid) return;
+                kpiGrid.innerHTML = '';
 
-    const settledData = data.filter(d => d.costBasisStatus !== 'pending');
-    const pendingTxCount = ALL_TRANSACTIONS.filter(d => d.costBasisStatus === 'pending').length;
+                const settledData = data.filter(d => d.costBasisStatus !== 'pending');
+                const pendingTxCount = ALL_TRANSACTIONS.filter(d => d.costBasisStatus === 'pending').length;
 
-    const salesOrders = settledData.filter(d => d.services_type === 'buy');
-    const buyOrders = settledData.filter(d => d.services_type === 'sell');
+                const salesOrders = settledData.filter(d => d.services_type === 'buy');
+                const buyOrders = settledData.filter(d => d.services_type === 'sell');
+                
+                const totalSalesVolume = salesOrders.reduce((sum, d) => sum + (parseFloat(d.Total_Amount) || 0), 0);
+                const totalBuyVolume = buyOrders.reduce((sum, d) => sum + (parseFloat(d.Total_Amount) || 0), 0);
+                const totalNetProfit = settledData.reduce((sum, d) => sum + (parseFloat(d.NetProfit) || 0), 0);
+                const numVipOrders = settledData.filter(d => (parseFloat(d.Vip_Amount) || 0) > 0).length;
+                const avgProfitPerOrder = settledData.length > 0 ? totalNetProfit / settledData.length : 0;
+                
+               // کد اصلاح شده و صحیح
+const networkFeeProfit = settledData.reduce((sum, d) => {
+    // ابتدا قیمت ارز را می‌خوانیم
+    const price = parseFloat(d.currency_price) || 0;
 
-    const rawTotalSalesVolume = salesOrders.reduce((sum, d) => sum + (parseFloat(d.Total_Amount) || 0), 0);
-    const rawTotalBuyVolume = buyOrders.reduce((sum, d) => sum + (parseFloat(d.Total_Amount) || 0), 0);
-    const rawTotalNetProfit = settledData.reduce((sum, d) => sum + (parseFloat(d.NetProfit) || 0), 0);
-    const rawNumVipOrders = settledData.filter(d => (parseFloat(d.Vip_Amount) || 0) > 0).length;
-    const rawAvgProfitPerOrder = settledData.length > 0 ? rawTotalNetProfit / settledData.length : 0;
+    // هوشمندانه کارمزد دریافتی را می‌خوانیم (هر دو حالت با فاصله و آندرلاین)
+    const networkWage = parseFloat(d.Network_Wage || d['Network Wage'] || 0);
 
-    const rawNetworkFeeProfit = settledData.reduce((sum, d) => {
-        const price = parseFloat(d.currency_price) || 0;
-        const networkWage = parseFloat(d.Network_Wage || d['Network Wage'] || 0);
-        const actualNetworkWage = parseFloat(d.ActualNetwork_Wage || d['ActualNetwork Wage'] || 0);
-        const profitPerTx = (networkWage - actualNetworkWage) * price;
-        return sum + (isNaN(profitPerTx) ? 0 : profitPerTx);
-    }, 0);
+    // هوشمندانه کارمزد واقعی را می‌خوانیم
+    const actualNetworkWage = parseFloat(d.ActualNetwork_Wage || d['ActualNetwork Wage'] || 0);
 
-    const kpis = [
-        { id: 'kpi-pending-tx', label: 'تراکنش‌های در انتظار تسویه', value: formatCurrency(pendingTxCount, 0), rawValue: pendingTxCount, unit: 'عدد', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', clickable: true },
-        { id: 'kpi-sales-volume', label: 'حجم کل فروش به مشتری', value: `${formatCurrency(rawTotalSalesVolume,0)}`, rawValue: rawTotalSalesVolume, unit: 'تومان', icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v.01' },
-        { id: 'kpi-buy-volume', label: 'حجم کل خرید از مشتری', value: `${formatCurrency(rawTotalBuyVolume,0)}`, rawValue: rawTotalBuyVolume, unit: 'تومان', icon: 'M3 10h18M7 15h1m4 0h1m4 0h1m-1-5h1.5a2.5 2.5 0 0 0 0-5H18' },
-        { id: 'kpi-net-profit', label: 'سود خالص (نهایی شده)', value: `${formatCurrency(rawTotalNetProfit,0)}`, rawValue: rawTotalNetProfit, unit: 'تومان', icon: 'M13 17h8m0 0V9m0 8l-8-8-4 4-6-6' },
-        { id: 'kpi-sales-count', label: 'تعداد فروش به مشتری', value: formatCurrency(salesOrders.length, 0), rawValue: salesOrders.length, unit: 'عدد', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2Z' },
-        { id: 'kpi-buy-count', label: 'تعداد خرید از مشتری', value: formatCurrency(buyOrders.length, 0), rawValue: buyOrders.length, unit: 'عدد', icon: 'M16 11V7a4 4 0 0 0-8 0v4M5 9h14l1 12H4L5 9z' },
-        { id: 'kpi-vip-orders', label: 'تعداد سفارش‌های VIP', value: formatCurrency(rawNumVipOrders, 0), rawValue: rawNumVipOrders, unit: 'عدد', icon: 'M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z' },
-        { id: 'kpi-avg-profit', label: 'میانگین سود هر سفارش', value: `${formatCurrency(rawAvgProfitPerOrder,0)}`, rawValue: rawAvgProfitPerOrder, unit: 'تومان', icon: 'M17 9V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2m2 4h10a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2Zm-3-9h2' },
-        { id: 'kpi-network-fee-profit', label: 'سود کارمزد شبکه', value: `${formatCurrency(rawNetworkFeeProfit,0)}`, rawValue: rawNetworkFeeProfit, unit: 'تومان', icon: 'M8.684 13.342C8.886 13.545 9 13.848 9 14.158V15.5a1.5 1.5 0 0 1-1.5 1.5h-1a1.5 1.5 0 0 1-1.5-1.5v-1.342c0-.31.114-.613.316-.816l8-8c.202-.202.505-.316.816-.316h1.342a1.5 1.5 0 0 1 1.5 1.5v1a1.5 1.5 0 0 1-1.5 1.5h-1.582c-.31 0-.613.114-.816.316l-8 8Z' },
-    ];
+    // سود را محاسبه می‌کنیم
+    const profitPerTx = (networkWage - actualNetworkWage) * price;
 
-    const intervalType = document.getElementById('interval-type-filter').value;
+    return sum + (isNaN(profitPerTx) ? 0 : profitPerTx);
+}, 0);
 
-    kpis.forEach(kpi => {
-        const card = document.createElement('div');
-        card.className = `glass-card p-4 rounded-xl flex flex-col gap-2 ${kpi.clickable ? 'cursor-pointer hover:bg-slate-800/50' : ''}`;
-        if(kpi.id) card.id = kpi.id;
-
-        const unitHtml = kpi.unit ? `<span class="text-xs mr-1">${kpi.unit}</span>` : '';
-        let cardContent = `
-            <div class="flex items-start gap-4">
-                <div class="bg-slate-800/60 h-10 w-10 shrink-0 flex items-center justify-center rounded-lg">
-                    <svg class="h-5 w-5 ${kpi.id === 'kpi-pending-tx' ? 'text-amber-400' : 'text-cyan-400'}" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="${kpi.icon}" />
-                    </svg>
-                </div>
-                <div>
-                    <p class="text-sm text-slate-400 mb-1">${kpi.label}</p>
-                    <p class="text-xl font-bold text-white flex items-baseline">${kpi.value} ${unitHtml}</p>
-                </div>
-            </div>`;
-
-        const targets = KPI_TARGETS[kpi.id];
-        if (targets && targets[intervalType] && targets[intervalType] > 0) {
-            const targetValue = targets[intervalType];
-            const currentValue = kpi.rawValue;
-            const progress = (currentValue / targetValue) * 100;
-            const progressPercentage = Math.min(progress, 100);
-
-            cardContent += `
-                <div class="progress-container mt-auto">
-                    <div class="flex justify-between text-xs text-slate-400 mb-1">
-                        <span>هدف: ${formatCurrency(targetValue, 0)}</span>
-                        <span>${formatCurrency(progress, 0)}%</span>
-                    </div>
-                    <div class="w-full bg-slate-700/50 rounded-full h-1.5">
-                        <div class="bg-cyan-500 h-1.5 rounded-full" style="width: ${progressPercentage}%"></div>
-                    </div>
-                </div>`;
-        }
-
-        card.innerHTML = cardContent;
-        kpiGrid.appendChild(card);
-    });
-
-    const pendingTxCard = document.getElementById('kpi-pending-tx');
-    if (pendingTxCard) {
-        pendingTxCard.addEventListener('click', showPendingTransactionsModal);
-    }
-}
+                const kpis = [
+                    { id: 'kpi-pending-tx', label: 'تراکنش‌های در انتظار تسویه', value: formatCurrency(pendingTxCount, 0), unit: 'عدد', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', clickable: true },
+                    { label: 'حجم کل فروش به مشتری', value: `${formatCurrency(totalSalesVolume,0)}`, unit: 'تومان', icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v.01' },
+                    { label: 'حجم کل خرید از مشتری', value: `${formatCurrency(totalBuyVolume,0)}`, unit: 'تومان', icon: 'M3 10h18M7 15h1m4 0h1m4 0h1m-1-5h1.5a2.5 2.5 0 0 0 0-5H18' },
+                    { label: 'سود خالص (نهایی شده)', value: `${formatCurrency(totalNetProfit,0)}`, unit: 'تومان', icon: 'M13 17h8m0 0V9m0 8l-8-8-4 4-6-6' },
+                    { label: 'تعداد فروش به مشتری', value: formatCurrency(salesOrders.length, 0), unit: 'عدد', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2Z' },
+                    { label: 'تعداد خرید از مشتری', value: formatCurrency(buyOrders.length, 0), unit: 'عدد', icon: 'M16 11V7a4 4 0 0 0-8 0v4M5 9h14l1 12H4L5 9z' },
+                    { label: 'تعداد سفارش‌های VIP', value: formatCurrency(numVipOrders, 0), unit: 'عدد', icon: 'M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z' },
+                    { label: 'میانگین سود هر سفارش', value: `${formatCurrency(avgProfitPerOrder,0)}`, unit: 'تومان', icon: 'M17 9V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2m2 4h10a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2Zm-3-9h2' },
+                    { label: 'سود کارمزد شبکه', value: `${formatCurrency(networkFeeProfit,0)}`, unit: 'تومان', icon: 'M8.684 13.342C8.886 13.545 9 13.848 9 14.158V15.5a1.5 1.5 0 0 1-1.5 1.5h-1a1.5 1.5 0 0 1-1.5-1.5v-1.342c0-.31.114-.613.316-.816l8-8c.202-.202.505-.316.816-.316h1.342a1.5 1.5 0 0 1 1.5 1.5v1a1.5 1.5 0 0 1-1.5 1.5h-1.582c-.31 0-.613.114-.816.316l-8 8Z' },
+                ];
+                kpis.forEach(kpi => {
+                    const card = document.createElement('div');
+                    card.className = `glass-card p-4 rounded-xl flex items-start gap-4 fade-in ${kpi.clickable ? 'cursor-pointer hover:bg-slate-800/50' : ''}`;
+                    if(kpi.id) card.id = kpi.id;
+                    const unitHtml = kpi.unit ? `<span class="text-xs mr-1">${kpi.unit}</span>` : '';
+                    card.innerHTML = `<div class="bg-slate-800/60 h-10 w-10 shrink-0 flex items-center justify-center rounded-lg"><svg class="h-5 w-5 ${kpi.id === 'kpi-pending-tx' ? 'text-amber-400' : 'text-cyan-400'}" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="${kpi.icon}" /></svg></div><div><p class="text-sm text-slate-400 mb-1">${kpi.label}</p><p class="text-xl font-bold text-white flex items-baseline">${kpi.value} ${unitHtml}</p></div>`;
+                    kpiGrid.appendChild(card);
+                });
+                
+                const pendingTxCard = document.getElementById('kpi-pending-tx');
+                if (pendingTxCard) {
+                    pendingTxCard.addEventListener('click', showPendingTransactionsModal);
+                }
+            }
             
           function renderSalesProfitChart(data) {
                 const settledData = data.filter(d => d.costBasisStatus !== 'pending' && d.costBasisStatus !== 'pending_import');
@@ -858,7 +848,7 @@
         }
 
         // --- REALTIME LISTENERS ---
-function setupRealtimeListeners() {
+   function setupRealtimeListeners() {
     const appId = firebaseConfig.projectId;
     const transactionsRef = collection(db, `artifacts/${appId}/public/data/transactions`);
     const usersRef = collection(db, `artifacts/${appId}/public/data/users`);
@@ -869,34 +859,13 @@ function setupRealtimeListeners() {
     unsubscribeTransactions = onSnapshot(transactionsRef, (snapshot) => {
         ALL_TRANSACTIONS = snapshot.docs.map(doc => {
             const data = doc.data();
-
-            let dateObject = null;
-            if (data.orderdate && typeof data.orderdate.toDate === 'function') {
-                dateObject = data.orderdate.toDate();
-            } else if (data.orderdate) {
-                dateObject = new Date(data.orderdate);
-            }
-            if (!dateObject || isNaN(dateObject)) {
-                console.error("Invalid date format for transaction ID:", doc.id, data);
-                dateObject = new Date();
-            }
-
-            const processedHistory = (data.editHistory || []).map(entry => {
-                if (entry.timestamp && typeof entry.timestamp.toDate === 'function') {
-                    return { ...entry, timestamp: entry.timestamp.toDate() };
-                }
-                return entry;
-            });
-
+            let dateObject = data.orderdate && data.orderdate.toDate ? data.orderdate.toDate() : new Date(data.orderdate);
+            if (isNaN(dateObject)) dateObject = new Date();
+            const processedHistory = (data.editHistory || []).map(entry => ({...entry, timestamp: entry.timestamp?.toDate ? entry.timestamp.toDate() : new Date(entry.timestamp) }));
             return { ...data, id: doc.id, orderdate: dateObject, editHistory: processedHistory };
         });
         populateCurrencyFilter();
-
-        if (isProcessingPools) {
-            console.log("Pool processing is already running, skipping this update.");
-            return;
-        }
-
+        if (isProcessingPools) return;
         processAllTransactionsForPools().then(() => {
             if(appInitialized) {
                 filterAndRenderTransactions();
@@ -916,31 +885,22 @@ function setupRealtimeListeners() {
     unsubscribeRoles = onSnapshot(rolesRef, (snapshot) => {
         roles = {};
         snapshot.docs.forEach(doc => { roles[doc.id] = { id: doc.id, ...doc.data() }; });
-        if (appInitialized) {
-            renderRolesSection();
-            applyPermissions();
-        }
+        if (appInitialized) { renderRolesSection(); applyPermissions(); }
     });
 
     if (unsubscribeSuppliers) unsubscribeSuppliers();
     unsubscribeSuppliers = onSnapshot(suppliersRef, (snapshot) => {
         ALL_SUPPLIERS = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        if (appInitialized) {
-            renderSuppliersTable();
-            filterAndRenderTransactions(); 
-        }
+        if (appInitialized) { renderSuppliersTable(); filterAndRenderTransactions(); }
     });
 
-    // Listener برای خواندن اهداف از Firestore
+    // Listener نهایی برای خواندن اهداف
     const targetsRef = collection(db, `artifacts/${appId}/public/data/kpi_targets`);
     onSnapshot(targetsRef, (snapshot) => {
-        KPI_TARGETS = {}; // ریست کردن آبجکت قبل از پر کردن مجدد
+        KPI_TARGETS = {};
         snapshot.docs.forEach(doc => {
             KPI_TARGETS[doc.id] = doc.data();
         });
-        console.log("اهداف KPI از دیتابیس خوانده شد:", KPI_TARGETS);
-
-        // آپدیت کردن داشبورد یا صفحه اهداف اگر فعال باشند
         if (appInitialized) {
             if (document.getElementById('page-dashboard').classList.contains('active')) {
                 updateDashboardView();
@@ -1106,7 +1066,6 @@ async function processAllTransactionsForPools() {
             document.getElementById(`page-${pageId}`).classList.add('active');
             if (pageId === 'pools') renderPoolsTable();
             if (pageId === 'suppliers') renderSuppliersTable();
-            if (pageId === 'targets') renderTargetsPage();
             if (pageId === 'users') { renderUsersTable(); renderRolesSection(); }
         }
         navLinks.forEach(link => link.addEventListener('click', (e) => {
@@ -1435,19 +1394,6 @@ function populateCurrencyFilter() {
                             updatedTxData[key] = value;
                         }
                     });
-                    // ========== Listener جدید برای خواندن اهداف از Firestore ==========
-const appId = firebaseConfig.projectId;
-const targetsRef = collection(db, `artifacts/${appId}/public/data/kpi_targets`);
-onSnapshot(targetsRef, (snapshot) => {
-    KPI_TARGETS = {}; // Reset before filling
-    snapshot.docs.forEach(doc => {
-        KPI_TARGETS[doc.id] = doc.data();
-    });
-    if (appInitialized && document.getElementById('page-dashboard').classList.contains('active')) {
-        updateDashboardView();
-    }
-});
-// ==========================================================
 
                     const networkWageToman = (updatedTxData.Network_Wage || 0) * updatedTxData.currency_price;
                     const actualNetworkWageToman = (updatedTxData.ActualNetwork_Wage || 0) * updatedTxData.currency_price;
@@ -2181,81 +2127,7 @@ onSnapshot(targetsRef, (snapshot) => {
                 loadingOverlay.innerHTML = `<p class="text-red-400 text-center">خطا در اتصال به Firebase.<br>لطفاً کنسول را برای جزئیات بیشتر بررسی کنید.</p>`;
             }
         }
-// ========== توابع جدید برای مدیریت صفحه اهداف ==========
-const TARGETABLE_KPIS = [
-    { id: 'kpi-net-profit', label: 'سود خالص (نهایی شده)' },
-    { id: 'kpi-sales-volume', label: 'حجم کل فروش به مشتری' },
-    { id: 'kpi-sales-count', label: 'تعداد فروش به مشتری' },
-    { id: 'kpi-network-fee-profit', label: 'سود کارمزد شبکه' }
-];
 
-function renderTargetsPage() {
-    const container = document.getElementById('targets-container');
-    if (!container) return;
-    container.innerHTML = '';
-
-    TARGETABLE_KPIS.forEach(kpi => {
-        const kpiTargets = KPI_TARGETS[kpi.id] || {};
-        const card = document.createElement('div');
-        card.className = 'glass-card p-6 rounded-2xl flex flex-col gap-4';
-        card.innerHTML = `
-            <h3 class="text-lg font-semibold text-cyan-400">${kpi.label}</h3>
-            <div class="space-y-3">
-                <div>
-                    <label for="${kpi.id}-daily" class="text-sm text-slate-400">هدف روزانه</label>
-                    <input type="number" id="${kpi.id}-daily" value="${kpiTargets.daily || ''}" placeholder="مثلا: 1500000" class="mt-1 bg-slate-800/50 border border-slate-700 text-slate-300 text-sm rounded-lg block w-full p-2.5">
-                </div>
-                <div>
-                    <label for="${kpi.id}-monthly" class="text-sm text-slate-400">هدف ماهانه</label>
-                    <input type="number" id="${kpi.id}-monthly" value="${kpiTargets.monthly || ''}" placeholder="مثلا: 50000000" class="mt-1 bg-slate-800/50 border border-slate-700 text-slate-300 text-sm rounded-lg block w-full p-2.5">
-                </div>
-                <div>
-                    <label for="${kpi.id}-quarterly" class="text-sm text-slate-400">هدف فصلی</label>
-                    <input type="number" id="${kpi.id}-quarterly" value="${kpiTargets.quarterly || ''}" placeholder="مثلا: 150000000" class="mt-1 bg-slate-800/50 border border-slate-700 text-slate-300 text-sm rounded-lg block w-full p-2.5">
-                </div>
-                <div>
-                    <label for="${kpi.id}-yearly" class="text-sm text-slate-400">هدف سالیانه</label>
-                    <input type="number" id="${kpi.id}-yearly" value="${kpiTargets.yearly || ''}" placeholder="مثلا: 600000000" class="mt-1 bg-slate-800/50 border border-slate-700 text-slate-300 text-sm rounded-lg block w-full p-2.5">
-                </div>
-            </div>
-            <button class="save-target-btn mt-4 w-full text-white bg-cyan-600 hover:bg-cyan-700 font-medium rounded-lg text-sm px-5 py-2.5 text-center" data-kpi-id="${kpi.id}">ذخیره تغییرات</button>
-        `;
-        container.appendChild(card);
-    });
-
-    document.querySelectorAll('.save-target-btn').forEach(btn => {
-        btn.addEventListener('click', handleTargetSave);
-    });
-}
-
-async function handleTargetSave(event) {
-    const kpiId = event.target.dataset.kpiId;
-    const targets = {
-        daily: parseFloat(document.getElementById(`${kpiId}-daily`).value) || 0,
-        monthly: parseFloat(document.getElementById(`${kpiId}-monthly`).value) || 0,
-        quarterly: parseFloat(document.getElementById(`${kpiId}-quarterly`).value) || 0,
-        yearly: parseFloat(document.getElementById(`${kpiId}-yearly`).value) || 0,
-    };
-
-    event.target.textContent = 'در حال ذخیره...';
-    event.target.disabled = true;
-
-    try {
-        const appId = firebaseConfig.projectId;
-        const targetRef = doc(db, `artifacts/${appId}/public/data/kpi_targets`, kpiId);
-        await setDoc(targetRef, targets, { merge: true });
-        event.target.textContent = 'با موفقیت ذخیره شد!';
-    } catch (error) {
-        console.error("Error saving target:", error);
-        event.target.textContent = 'خطا در ذخیره‌سازی';
-    } finally {
-        setTimeout(() => {
-            event.target.textContent = 'ذخیره تغییرات';
-            event.target.disabled = false;
-        }, 2000);
-    }
-}
-// ========================================================
         init();
            // ========== کد جدید را دقیقا اینجا اضافه کنید ==========
         window.firebaseTools = {
