@@ -875,6 +875,12 @@ async function processAllTransactionsForPools() {
             if (isProcessingPools) return;
             isProcessingPools = true;
 
+            // تابع کمکی برای گرد کردن اعداد مالی به ۴ رقم اعشار
+            const roundCurrency = (value) => {
+                if (typeof value !== 'number' || isNaN(value)) return 0;
+                return Math.round(value * 10000) / 10000;
+            };
+
             try {
                 const localTransactions = JSON.parse(JSON.stringify(ALL_TRANSACTIONS));
                 const sortedTransactions = localTransactions.sort((a, b) => new Date(a.orderdate) - new Date(b.orderdate));
@@ -912,19 +918,14 @@ async function processAllTransactionsForPools() {
                         }
                     }
 
-                    // --- بخش کلیدی جدید: پردازش صف با اولویت حداکثر فروش ---
                     let queueChanged = true;
                     while(queueChanged && currentQueue.length > 0) {
                         queueChanged = false;
                         const availableQty = currentPool.reduce((sum, layer) => sum + layer.qty, 0);
-
-                        // پیدا کردن اولین سفارشی در صف که قابل انجام است
                         const fulfillableOrderIndex = currentQueue.findIndex(sale => availableQty >= sale.currency_amount);
 
                         if (fulfillableOrderIndex > -1) {
-                            // اگر سفارشی پیدا شد، آن را از صف خارج کرده و پردازش کن
                             const nextSale = currentQueue.splice(fulfillableOrderIndex, 1)[0];
-                            
                             let saleAmount = nextSale.currency_amount;
                             let totalCostForThisSale = 0;
                             for (const layer of currentPool) {
@@ -937,16 +938,24 @@ async function processAllTransactionsForPools() {
                             while (currentPool.length > 0 && currentPool[0].qty <= 0) {
                                 currentPool.shift();
                             }
-                            const newCostBasis = nextSale.currency_amount > 0 ? totalCostForThisSale / nextSale.currency_amount : 0;
+
+                            // گرد کردن مقادیر محاسبه شده
+                            const newCostBasis = roundCurrency(nextSale.currency_amount > 0 ? totalCostForThisSale / nextSale.currency_amount : 0);
                             const actualNetworkWageToman = (nextSale['ActualNetwork Wage'] || 0) * nextSale.currency_price;
-                            const newNetProfit = nextSale.Total_Amount - (totalCostForThisSale + actualNetworkWageToman);
-                            
+                            const newNetProfit = roundCurrency(nextSale.Total_Amount - (totalCostForThisSale + actualNetworkWageToman));
+
                             currentLog.push({ date: nextSale.orderdate, amount: nextSale.currency_amount, orderid: nextSale.orderid, type: 'برداشت', rate: newCostBasis });
-                            if (nextSale.Cost_Basis !== newCostBasis || nextSale.NetProfit !== newNetProfit || nextSale.costBasisStatus !== 'settled') {
-                                updatesBatch.update(doc(db, `artifacts/${firebaseConfig.projectId}/public/data/transactions`, nextSale.id), { costBasisStatus: 'settled', Cost_Basis: newCostBasis, NetProfit: newNetProfit });
+                            
+                            // مقایسه مقادیر گرد شده برای جلوگیری از آپدیت غیر ضروری
+                            if (roundCurrency(nextSale.Cost_Basis) !== newCostBasis || roundCurrency(nextSale.NetProfit) !== newNetProfit || nextSale.costBasisStatus !== 'settled') {
+                                updatesBatch.update(doc(db, `artifacts/${firebaseConfig.projectId}/public/data/transactions`, nextSale.id), { 
+                                    costBasisStatus: 'settled', 
+                                    Cost_Basis: newCostBasis, 
+                                    NetProfit: newNetProfit 
+                                });
                                 updatesNeeded = true;
                             }
-                            queueChanged = true; // چون یک سفارش انجام شد، حلقه را تکرار کن
+                            queueChanged = true;
                         }
                     }
                 }
@@ -963,9 +972,9 @@ async function processAllTransactionsForPools() {
                 currencyPools = {};
                 for(const slug of allCurrencySlugs) {
                     const finalPool = fifoPools[slug];
-                    const finalPoolQty = finalPool.reduce((sum, layer) => sum + layer.qty, 0);
+                    const finalPoolQty = roundCurrency(finalPool.reduce((sum, layer) => sum + layer.qty, 0));
                     const finalPoolValue = finalPool.reduce((sum, layer) => sum + (layer.qty * layer.cost), 0);
-                    const finalAvgCost = finalPoolQty > 0 ? finalPoolValue / finalPoolQty : 0;
+                    const finalAvgCost = finalPoolQty > 0 ? roundCurrency(finalPoolValue / finalPoolQty) : 0;
                     currencyPools[slug] = { 
                         quantity: finalPoolQty, 
                         weightedAvgCost: finalAvgCost, 
@@ -974,7 +983,7 @@ async function processAllTransactionsForPools() {
                 }
 
                 if (updatesNeeded) {
-                    console.log("Committing final batch updates...");
+                    console.log("Committing final batch updates to break loop...");
                     await updatesBatch.commit();
                 }
             } catch (error) {
