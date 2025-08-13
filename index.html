@@ -587,11 +587,22 @@
                 const numVipOrders = settledData.filter(d => (parseFloat(d.Vip_Amount) || 0) > 0).length;
                 const avgProfitPerOrder = settledData.length > 0 ? totalNetProfit / settledData.length : 0;
                 
-                const networkFeeProfit = settledData.reduce((sum, d) => {
-                    const price = parseFloat(d.currency_price) || 0;
-                    const profitPerTx = ((parseFloat(d.Network_Wage) || 0) - (parseFloat(d.ActualNetwork_Wage) || 0)) * price;
-                    return sum + (isNaN(profitPerTx) ? 0 : profitPerTx);
-                }, 0);
+               // کد اصلاح شده و صحیح
+const networkFeeProfit = settledData.reduce((sum, d) => {
+    // ابتدا قیمت ارز را می‌خوانیم
+    const price = parseFloat(d.currency_price) || 0;
+
+    // هوشمندانه کارمزد دریافتی را می‌خوانیم (هر دو حالت با فاصله و آندرلاین)
+    const networkWage = parseFloat(d.Network_Wage || d['Network Wage'] || 0);
+
+    // هوشمندانه کارمزد واقعی را می‌خوانیم
+    const actualNetworkWage = parseFloat(d.ActualNetwork_Wage || d['ActualNetwork Wage'] || 0);
+
+    // سود را محاسبه می‌کنیم
+    const profitPerTx = (networkWage - actualNetworkWage) * price;
+
+    return sum + (isNaN(profitPerTx) ? 0 : profitPerTx);
+}, 0);
 
                 const kpis = [
                     { id: 'kpi-pending-tx', label: 'تراکنش‌های در انتظار تسویه', value: formatCurrency(pendingTxCount, 0), unit: 'عدد', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', clickable: true },
