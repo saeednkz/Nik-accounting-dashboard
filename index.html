@@ -527,20 +527,20 @@
                 setInterval(updateTime, 60000);
             }
 
-            function populateDashboardFilters() {
-                const currentJalaliYear = new persianDate().year();
-                yearFilter.innerHTML = '';
-                for (let year = 1397; year <= currentJalaliYear; year++) {
-                     yearFilter.innerHTML += `<option value="${year}">${year}</option>`;
-                }
-                
-                intervalTypeFilter.innerHTML = `<option value="monthly">ماهیانه</option><option value="quarterly">فصلی</option><option value="yearly">سالیانه</option>`;
-                updatePeriodFilter();
-                
-                const currentJalaliDate = new persianDate();
-                yearFilter.value = currentJalaliDate.year();
-                periodFilter.value = currentJalaliDate.month() - 1;
-            }
+         function populateDashboardFilters() {
+    const currentJalaliYear = new persianDate().year();
+    yearFilter.innerHTML = '';
+    for (let year = 1397; year <= currentJalaliYear; year++) {
+        yearFilter.innerHTML += `<option value="${year}">${year}</option>`;
+    }
+
+    intervalTypeFilter.innerHTML = `<option value="daily">روزانه</option><option value="monthly">ماهیانه</option><option value="quarterly">فصلی</option><option value="yearly">سالیانه</option>`;
+
+    const currentJalaliDate = new persianDate();
+    yearFilter.value = currentJalaliDate.year();
+    intervalTypeFilter.value = 'daily';
+    updatePeriodFilter();
+}
 
             function updatePeriodFilter() {
                 const intervalType = intervalTypeFilter.value;
@@ -858,79 +858,99 @@
         }
 
         // --- REALTIME LISTENERS ---
-        function setupRealtimeListeners() {
-            const appId = firebaseConfig.projectId;
-            const transactionsRef = collection(db, `artifacts/${appId}/public/data/transactions`);
-            const usersRef = collection(db, `artifacts/${appId}/public/data/users`);
-            const rolesRef = collection(db, `artifacts/${appId}/public/data/roles`);
-            const suppliersRef = collection(db, `artifacts/${appId}/public/data/suppliers`);
+function setupRealtimeListeners() {
+    const appId = firebaseConfig.projectId;
+    const transactionsRef = collection(db, `artifacts/${appId}/public/data/transactions`);
+    const usersRef = collection(db, `artifacts/${appId}/public/data/users`);
+    const rolesRef = collection(db, `artifacts/${appId}/public/data/roles`);
+    const suppliersRef = collection(db, `artifacts/${appId}/public/data/suppliers`);
 
-            if (unsubscribeTransactions) unsubscribeTransactions();
-            unsubscribeTransactions = onSnapshot(transactionsRef, (snapshot) => {
-                ALL_TRANSACTIONS = snapshot.docs.map(doc => {
-                    const data = doc.data();
-                    
-                    let dateObject = null;
-                    if (data.orderdate && typeof data.orderdate.toDate === 'function') {
-                        dateObject = data.orderdate.toDate();
-                    } else if (data.orderdate) {
-                        dateObject = new Date(data.orderdate);
-                    }
-                    if (!dateObject || isNaN(dateObject)) {
-                        console.error("Invalid date format for transaction ID:", doc.id, data);
-                        dateObject = new Date();
-                    }
-                    
-                    const processedHistory = (data.editHistory || []).map(entry => {
-                        if (entry.timestamp && typeof entry.timestamp.toDate === 'function') {
-                            return { ...entry, timestamp: entry.timestamp.toDate() };
-                        }
-                        return entry;
-                    });
+    if (unsubscribeTransactions) unsubscribeTransactions();
+    unsubscribeTransactions = onSnapshot(transactionsRef, (snapshot) => {
+        ALL_TRANSACTIONS = snapshot.docs.map(doc => {
+            const data = doc.data();
 
-                    return { ...data, id: doc.id, orderdate: dateObject, editHistory: processedHistory };
-                });
-populateCurrencyFilter(); // <-- این خط جدید است
-                
-                if (isProcessingPools) {
-                    console.log("Pool processing is already running, skipping this update.");
-                    return;
+            let dateObject = null;
+            if (data.orderdate && typeof data.orderdate.toDate === 'function') {
+                dateObject = data.orderdate.toDate();
+            } else if (data.orderdate) {
+                dateObject = new Date(data.orderdate);
+            }
+            if (!dateObject || isNaN(dateObject)) {
+                console.error("Invalid date format for transaction ID:", doc.id, data);
+                dateObject = new Date();
+            }
+
+            const processedHistory = (data.editHistory || []).map(entry => {
+                if (entry.timestamp && typeof entry.timestamp.toDate === 'function') {
+                    return { ...entry, timestamp: entry.timestamp.toDate() };
                 }
-                
-                processAllTransactionsForPools().then(() => {
-                    if(appInitialized) {
-                        filterAndRenderTransactions();
-                        updateDashboardView();
-                        renderPoolsTable();
-                    }
-                });
+                return entry;
             });
 
-            if (unsubscribeUsers) unsubscribeUsers();
-            unsubscribeUsers = onSnapshot(usersRef, (snapshot) => {
-                users = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                if (appInitialized) renderUsersTable();
-            });
+            return { ...data, id: doc.id, orderdate: dateObject, editHistory: processedHistory };
+        });
+        populateCurrencyFilter();
 
-            if (unsubscribeRoles) unsubscribeRoles();
-            unsubscribeRoles = onSnapshot(rolesRef, (snapshot) => {
-                roles = {};
-                snapshot.docs.forEach(doc => { roles[doc.id] = { id: doc.id, ...doc.data() }; });
-                if (appInitialized) {
-                    renderRolesSection();
-                    applyPermissions();
-                }
-            });
-
-            if (unsubscribeSuppliers) unsubscribeSuppliers();
-            unsubscribeSuppliers = onSnapshot(suppliersRef, (snapshot) => {
-                ALL_SUPPLIERS = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                if (appInitialized) {
-                    renderSuppliersTable();
-                    filterAndRenderTransactions(); 
-                }
-            });
+        if (isProcessingPools) {
+            console.log("Pool processing is already running, skipping this update.");
+            return;
         }
+
+        processAllTransactionsForPools().then(() => {
+            if(appInitialized) {
+                filterAndRenderTransactions();
+                updateDashboardView();
+                renderPoolsTable();
+            }
+        });
+    });
+
+    if (unsubscribeUsers) unsubscribeUsers();
+    unsubscribeUsers = onSnapshot(usersRef, (snapshot) => {
+        users = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        if (appInitialized) renderUsersTable();
+    });
+
+    if (unsubscribeRoles) unsubscribeRoles();
+    unsubscribeRoles = onSnapshot(rolesRef, (snapshot) => {
+        roles = {};
+        snapshot.docs.forEach(doc => { roles[doc.id] = { id: doc.id, ...doc.data() }; });
+        if (appInitialized) {
+            renderRolesSection();
+            applyPermissions();
+        }
+    });
+
+    if (unsubscribeSuppliers) unsubscribeSuppliers();
+    unsubscribeSuppliers = onSnapshot(suppliersRef, (snapshot) => {
+        ALL_SUPPLIERS = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        if (appInitialized) {
+            renderSuppliersTable();
+            filterAndRenderTransactions(); 
+        }
+    });
+
+    // Listener برای خواندن اهداف از Firestore
+    const targetsRef = collection(db, `artifacts/${appId}/public/data/kpi_targets`);
+    onSnapshot(targetsRef, (snapshot) => {
+        KPI_TARGETS = {}; // ریست کردن آبجکت قبل از پر کردن مجدد
+        snapshot.docs.forEach(doc => {
+            KPI_TARGETS[doc.id] = doc.data();
+        });
+        console.log("اهداف KPI از دیتابیس خوانده شد:", KPI_TARGETS);
+
+        // آپدیت کردن داشبورد یا صفحه اهداف اگر فعال باشند
+        if (appInitialized) {
+            if (document.getElementById('page-dashboard').classList.contains('active')) {
+                updateDashboardView();
+            }
+            if (document.getElementById('page-targets').classList.contains('active')) {
+                renderTargetsPage();
+            }
+        }
+    });
+}
         
         // --- DATA PROCESSING ---
 async function processAllTransactionsForPools() {
