@@ -76,6 +76,12 @@
         .datepicker-plot-area .datepicker-calendar .day-items span:hover { background-color: #334155 !important; }
         .datepicker-plot-area .datepicker-calendar .day-items span.selected { background-color: #0ea5e9 !important; color: #fff !important; }
         .datepicker-plot-area .datepicker-navigator .pwt-btn-next, .datepicker-plot-area .datepicker-navigator .pwt-btn-prev { color: #94a3b8 !important; }
+        .progress-container {
+            transition: all 0.3s ease;
+        }
+        .progress-container .bg-cyan-500 {
+            transition: width 0.5s ease-out;
+        }
     </style>
 </head>
 <body class="text-slate-300">
@@ -570,65 +576,96 @@
                 renderProfitCompositionChart(data);
             }
 
-            function renderKPIs(data) {
-                const kpiGrid = document.getElementById('kpi-grid');
-                if (!kpiGrid) return;
-                kpiGrid.innerHTML = '';
+       // ========== نسخه جدید و کامل تابع renderKPIs ==========
+function renderKPIs(data) {
+    const kpiGrid = document.getElementById('kpi-grid');
+    if (!kpiGrid) return;
+    kpiGrid.innerHTML = '';
 
-                const settledData = data.filter(d => d.costBasisStatus !== 'pending');
-                const pendingTxCount = ALL_TRANSACTIONS.filter(d => d.costBasisStatus === 'pending').length;
+    const settledData = data.filter(d => d.costBasisStatus !== 'pending');
+    const pendingTxCount = ALL_TRANSACTIONS.filter(d => d.costBasisStatus === 'pending').length;
 
-                const salesOrders = settledData.filter(d => d.services_type === 'buy');
-                const buyOrders = settledData.filter(d => d.services_type === 'sell');
-                
-                const totalSalesVolume = salesOrders.reduce((sum, d) => sum + (parseFloat(d.Total_Amount) || 0), 0);
-                const totalBuyVolume = buyOrders.reduce((sum, d) => sum + (parseFloat(d.Total_Amount) || 0), 0);
-                const totalNetProfit = settledData.reduce((sum, d) => sum + (parseFloat(d.NetProfit) || 0), 0);
-                const numVipOrders = settledData.filter(d => (parseFloat(d.Vip_Amount) || 0) > 0).length;
-                const avgProfitPerOrder = settledData.length > 0 ? totalNetProfit / settledData.length : 0;
-                
-               // کد اصلاح شده و صحیح
-const networkFeeProfit = settledData.reduce((sum, d) => {
-    // ابتدا قیمت ارز را می‌خوانیم
-    const price = parseFloat(d.currency_price) || 0;
+    const salesOrders = settledData.filter(d => d.services_type === 'buy');
+    const buyOrders = settledData.filter(d => d.services_type === 'sell');
+    
+    // مقادیر خام و عددی برای محاسبات
+    const rawTotalSalesVolume = salesOrders.reduce((sum, d) => sum + (parseFloat(d.Total_Amount) || 0), 0);
+    const rawTotalBuyVolume = buyOrders.reduce((sum, d) => sum + (parseFloat(d.Total_Amount) || 0), 0);
+    const rawTotalNetProfit = settledData.reduce((sum, d) => sum + (parseFloat(d.NetProfit) || 0), 0);
+    const rawNumVipOrders = settledData.filter(d => (parseFloat(d.Vip_Amount) || 0) > 0).length;
+    const rawAvgProfitPerOrder = settledData.length > 0 ? rawTotalNetProfit / settledData.length : 0;
+    
+    const rawNetworkFeeProfit = settledData.reduce((sum, d) => {
+        const price = parseFloat(d.currency_price) || 0;
+        const networkWage = parseFloat(d.Network_Wage || d['Network Wage'] || 0);
+        const actualNetworkWage = parseFloat(d.ActualNetwork_Wage || d['ActualNetwork Wage'] || 0);
+        const profitPerTx = (networkWage - actualNetworkWage) * price;
+        return sum + (isNaN(profitPerTx) ? 0 : profitPerTx);
+    }, 0);
 
-    // هوشمندانه کارمزد دریافتی را می‌خوانیم (هر دو حالت با فاصله و آندرلاین)
-    const networkWage = parseFloat(d.Network_Wage || d['Network Wage'] || 0);
+    const kpis = [
+        // شناسه‌ها (id) برای اتصال به اهداف اضافه شده‌اند
+        { id: 'kpi-pending-tx', label: 'تراکنش‌های در انتظار تسویه', value: formatCurrency(pendingTxCount, 0), rawValue: pendingTxCount, unit: 'عدد', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', clickable: true },
+        { id: 'kpi-sales-volume', label: 'حجم کل فروش به مشتری', value: `${formatCurrency(rawTotalSalesVolume,0)}`, rawValue: rawTotalSalesVolume, unit: 'تومان', icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v.01' },
+        { id: 'kpi-buy-volume', label: 'حجم کل خرید از مشتری', value: `${formatCurrency(rawTotalBuyVolume,0)}`, rawValue: rawTotalBuyVolume, unit: 'تومان', icon: 'M3 10h18M7 15h1m4 0h1m4 0h1m-1-5h1.5a2.5 2.5 0 0 0 0-5H18' },
+        { id: 'kpi-net-profit', label: 'سود خالص (نهایی شده)', value: `${formatCurrency(rawTotalNetProfit,0)}`, rawValue: rawTotalNetProfit, unit: 'تومان', icon: 'M13 17h8m0 0V9m0 8l-8-8-4 4-6-6' },
+        { id: 'kpi-sales-count', label: 'تعداد فروش به مشتری', value: formatCurrency(salesOrders.length, 0), rawValue: salesOrders.length, unit: 'عدد', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2Z' },
+        { id: 'kpi-buy-count', label: 'تعداد خرید از مشتری', value: formatCurrency(buyOrders.length, 0), rawValue: buyOrders.length, unit: 'عدد', icon: 'M16 11V7a4 4 0 0 0-8 0v4M5 9h14l1 12H4L5 9z' },
+        { id: 'kpi-vip-orders', label: 'تعداد سفارش‌های VIP', value: formatCurrency(rawNumVipOrders, 0), rawValue: rawNumVipOrders, unit: 'عدد', icon: 'M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z' },
+        { id: 'kpi-avg-profit', label: 'میانگین سود هر سفارش', value: `${formatCurrency(rawAvgProfitPerOrder,0)}`, rawValue: rawAvgProfitPerOrder, unit: 'تومان', icon: 'M17 9V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2m2 4h10a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2Zm-3-9h2' },
+        { id: 'kpi-network-fee-profit', label: 'سود کارمزد شبکه', value: `${formatCurrency(rawNetworkFeeProfit,0)}`, rawValue: rawNetworkFeeProfit, unit: 'تومان', icon: 'M8.684 13.342C8.886 13.545 9 13.848 9 14.158V15.5a1.5 1.5 0 0 1-1.5 1.5h-1a1.5 1.5 0 0 1-1.5-1.5v-1.342c0-.31.114-.613.316-.816l8-8c.202-.202.505-.316.816-.316h1.342a1.5 1.5 0 0 1 1.5 1.5v1a1.5 1.5 0 0 1-1.5 1.5h-1.582c-.31 0-.613.114-.816.316l-8 8Z' },
+    ];
+    
+    const intervalType = document.getElementById('interval-type-filter').value; // e.g., 'monthly'
+    
+    kpis.forEach(kpi => {
+        const card = document.createElement('div');
+        card.className = `glass-card p-4 rounded-xl flex flex-col gap-4 fade-in ${kpi.clickable ? 'cursor-pointer hover:bg-slate-800/50' : ''}`;
+        if(kpi.id) card.id = kpi.id;
 
-    // هوشمندانه کارمزد واقعی را می‌خوانیم
-    const actualNetworkWage = parseFloat(d.ActualNetwork_Wage || d['ActualNetwork Wage'] || 0);
+        const unitHtml = kpi.unit ? `<span class="text-xs mr-1">${kpi.unit}</span>` : '';
+        let cardContent = `
+            <div class="flex items-start gap-4">
+                <div class="bg-slate-800/60 h-10 w-10 shrink-0 flex items-center justify-center rounded-lg">
+                    <svg class="h-5 w-5 ${kpi.id === 'kpi-pending-tx' ? 'text-amber-400' : 'text-cyan-400'}" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="${kpi.icon}" />
+                    </svg>
+                </div>
+                <div>
+                    <p class="text-sm text-slate-400 mb-1">${kpi.label}</p>
+                    <p class="text-xl font-bold text-white flex items-baseline">${kpi.value} ${unitHtml}</p>
+                </div>
+            </div>`;
+        
+        // بخش محاسبه و افزودن نوار پیشرفت
+        const targets = KPI_TARGETS[kpi.id];
+        if (targets && targets[intervalType]) {
+            const targetValue = targets[intervalType];
+            const currentValue = kpi.rawValue;
+            const progress = targetValue > 0 ? (currentValue / targetValue) * 100 : 0;
+            const progressPercentage = Math.min(progress, 100).toFixed(2); // حداکثر ۱۰۰٪
 
-    // سود را محاسبه می‌کنیم
-    const profitPerTx = (networkWage - actualNetworkWage) * price;
+            cardContent += `
+                <div class="progress-container mt-auto">
+                    <div class="flex justify-between text-xs text-slate-400 mb-1">
+                        <span>هدف: ${formatCurrency(targetValue, 0)}</span>
+                        <span>${formatCurrency(progress, 0)}%</span>
+                    </div>
+                    <div class="w-full bg-slate-700/50 rounded-full h-1.5">
+                        <div class="bg-cyan-500 h-1.5 rounded-full" style="width: ${progressPercentage}%"></div>
+                    </div>
+                </div>`;
+        }
 
-    return sum + (isNaN(profitPerTx) ? 0 : profitPerTx);
-}, 0);
-
-                const kpis = [
-                    { id: 'kpi-pending-tx', label: 'تراکنش‌های در انتظار تسویه', value: formatCurrency(pendingTxCount, 0), unit: 'عدد', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', clickable: true },
-                    { label: 'حجم کل فروش به مشتری', value: `${formatCurrency(totalSalesVolume,0)}`, unit: 'تومان', icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v.01' },
-                    { label: 'حجم کل خرید از مشتری', value: `${formatCurrency(totalBuyVolume,0)}`, unit: 'تومان', icon: 'M3 10h18M7 15h1m4 0h1m4 0h1m-1-5h1.5a2.5 2.5 0 0 0 0-5H18' },
-                    { label: 'سود خالص (نهایی شده)', value: `${formatCurrency(totalNetProfit,0)}`, unit: 'تومان', icon: 'M13 17h8m0 0V9m0 8l-8-8-4 4-6-6' },
-                    { label: 'تعداد فروش به مشتری', value: formatCurrency(salesOrders.length, 0), unit: 'عدد', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2Z' },
-                    { label: 'تعداد خرید از مشتری', value: formatCurrency(buyOrders.length, 0), unit: 'عدد', icon: 'M16 11V7a4 4 0 0 0-8 0v4M5 9h14l1 12H4L5 9z' },
-                    { label: 'تعداد سفارش‌های VIP', value: formatCurrency(numVipOrders, 0), unit: 'عدد', icon: 'M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z' },
-                    { label: 'میانگین سود هر سفارش', value: `${formatCurrency(avgProfitPerOrder,0)}`, unit: 'تومان', icon: 'M17 9V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2m2 4h10a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2Zm-3-9h2' },
-                    { label: 'سود کارمزد شبکه', value: `${formatCurrency(networkFeeProfit,0)}`, unit: 'تومان', icon: 'M8.684 13.342C8.886 13.545 9 13.848 9 14.158V15.5a1.5 1.5 0 0 1-1.5 1.5h-1a1.5 1.5 0 0 1-1.5-1.5v-1.342c0-.31.114-.613.316-.816l8-8c.202-.202.505-.316.816-.316h1.342a1.5 1.5 0 0 1 1.5 1.5v1a1.5 1.5 0 0 1-1.5 1.5h-1.582c-.31 0-.613.114-.816.316l-8 8Z' },
-                ];
-                kpis.forEach(kpi => {
-                    const card = document.createElement('div');
-                    card.className = `glass-card p-4 rounded-xl flex items-start gap-4 fade-in ${kpi.clickable ? 'cursor-pointer hover:bg-slate-800/50' : ''}`;
-                    if(kpi.id) card.id = kpi.id;
-                    const unitHtml = kpi.unit ? `<span class="text-xs mr-1">${kpi.unit}</span>` : '';
-                    card.innerHTML = `<div class="bg-slate-800/60 h-10 w-10 shrink-0 flex items-center justify-center rounded-lg"><svg class="h-5 w-5 ${kpi.id === 'kpi-pending-tx' ? 'text-amber-400' : 'text-cyan-400'}" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="${kpi.icon}" /></svg></div><div><p class="text-sm text-slate-400 mb-1">${kpi.label}</p><p class="text-xl font-bold text-white flex items-baseline">${kpi.value} ${unitHtml}</p></div>`;
-                    kpiGrid.appendChild(card);
-                });
-                
-                const pendingTxCard = document.getElementById('kpi-pending-tx');
-                if (pendingTxCard) {
-                    pendingTxCard.addEventListener('click', showPendingTransactionsModal);
-                }
-            }
+        card.innerHTML = cardContent;
+        kpiGrid.appendChild(card);
+    });
+    
+    const pendingTxCard = document.getElementById('kpi-pending-tx');
+    if (pendingTxCard) {
+        pendingTxCard.addEventListener('click', showPendingTransactionsModal);
+    }
+}
             
           function renderSalesProfitChart(data) {
                 const settledData = data.filter(d => d.costBasisStatus !== 'pending' && d.costBasisStatus !== 'pending_import');
@@ -1005,6 +1042,28 @@ async function processAllTransactionsForPools() {
         }
 
         // --- UI & PAGE LOGIC ---
+
+// ========== کد جدید برای تعریف اهداف ==========
+const KPI_TARGETS = {
+    // اهداف برای کارت "سود خالص"
+    'kpi-net-profit': {
+        monthly: 50000000, // تارگت سود ماهانه: ۵۰ میلیون تومان
+        quarterly: 150000000, // تارگت سود فصلی: ۱۵۰ میلیون تومان
+        yearly: 600000000 // تارگت سود سالیانه: ۶۰۰ میلیون تومان
+    },
+    // اهداف برای کارت "حجم کل فروش"
+    'kpi-sales-volume': {
+        monthly: 3000000000, // تارگت فروش ماهانه: ۳ میلیارد تومان
+        yearly: 40000000000
+    },
+    // اهداف برای کارت "تعداد فروش به مشتری"
+    'kpi-sales-count': {
+        monthly: 100, // تارگت: ۱۰۰ سفارش فروش در ماه
+        quarterly: 300
+    }
+    // شما می‌توانید برای هر کارت دیگری که id دارد، تارگت تعریف کنید
+};
+// ===============================================
         let salesProfitChart, profitCompositionChart;
         let currentPage = 1;
         const ROWS_PER_PAGE = 15;
