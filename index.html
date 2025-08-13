@@ -76,13 +76,6 @@
         .datepicker-plot-area .datepicker-calendar .day-items span:hover { background-color: #334155 !important; }
         .datepicker-plot-area .datepicker-calendar .day-items span.selected { background-color: #0ea5e9 !important; color: #fff !important; }
         .datepicker-plot-area .datepicker-navigator .pwt-btn-next, .datepicker-plot-area .datepicker-navigator .pwt-btn-prev { color: #94a3b8 !important; }
-        /* استایل برای نوار پیشرفت */
-        .progress-container {
-            transition: all 0.3s ease;
-        }
-        .progress-container .bg-cyan-500 {
-            transition: width 0.5s ease-out;
-        }
     </style>
 </head>
 <body class="text-slate-300">
@@ -140,12 +133,6 @@
                     <svg class="h-6 w-6 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m-7.5-2.962a3.75 3.75 0 015.962 0zM12 6.75a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z" /></svg>
                     <span class="mr-4 opacity-0 max-w-0 group-hover:opacity-100 group-hover:max-w-full transition-all duration-300 whitespace-nowrap overflow-hidden">تامین‌کنندگان</span>
                 </a>
-                <a href="#" id="nav-targets" class="nav-link flex items-center p-3 rounded-lg text-slate-400 hover:bg-slate-700/50">
-    <svg class="h-6 w-6 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M10.125 2.25h-4.5c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125v-9M10.125 2.25h.375a9 9 0 019 9v.375M10.125 2.25c3.866 0 7.5 3.134 7.5 7.5v.375m-7.5-7.875L7.5 15l4.5-3L15 15l-2.625-7.875" />
-    </svg>
-    <span class="mr-4 opacity-0 max-w-0 group-hover:opacity-100 group-hover:max-w-full transition-all duration-300 whitespace-nowrap overflow-hidden">مدیریت اهداف</span>
-</a>
                  <a href="#" id="nav-users" class="nav-link flex items-center p-3 rounded-lg text-slate-400 hover:bg-slate-700/50">
                     <svg class="h-6 w-6 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-4.663M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0z" /></svg>
                     <span class="mr-4 opacity-0 max-w-0 group-hover:opacity-100 group-hover:max-w-full transition-all duration-300 whitespace-nowrap overflow-hidden">مدیریت کاربران</span>
@@ -173,7 +160,6 @@
                             <select id="interval-type-filter" class="bg-slate-800/50 border border-slate-700 text-slate-300 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block w-full p-2.5"></select>
                             <select id="year-filter" class="bg-slate-800/50 border border-slate-700 text-slate-300 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block w-full p-2.5"></select>
                             <select id="period-filter" class="bg-slate-800/50 border border-slate-700 text-slate-300 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block w-full p-2.5"></select>
-                            <input type="text" id="daily-date-picker" placeholder="انتخاب روز" class="persian-datepicker bg-slate-800/50 border border-slate-700 text-slate-300 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block w-full p-2.5" style="display: none;">
                         </div>
                     </header>
                     <div id="kpi-grid" class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-5 gap-4 mb-6"></div>
@@ -363,17 +349,6 @@
                     </div>
                 </div>
             </div>
-            </div>
-
-<div id="page-targets" class="page-content">
-    <div class="flex flex-col h-full">
-        <header class="flex-shrink-0 flex flex-wrap items-center justify-between gap-4 mb-6">
-            <h2 class="text-3xl font-bold text-slate-100">مدیریت اهداف KPI</h2>
-        </header>
-        <div id="targets-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            </div>
-    </div>
-</div>
         </main>
     </div>
 
@@ -528,99 +503,59 @@
                 setInterval(updateTime, 60000);
             }
 
-          function populateDashboardFilters() {
-    const currentJalaliYear = new persianDate().year();
-    yearFilter.innerHTML = '';
-    for (let year = 1397; year <= currentJalaliYear; year++) {
-        yearFilter.innerHTML += `<option value="${year}">${year}</option>`;
-    }
+            function populateDashboardFilters() {
+                const currentJalaliYear = new persianDate().year();
+                yearFilter.innerHTML = '';
+                for (let year = 1397; year <= currentJalaliYear; year++) {
+                     yearFilter.innerHTML += `<option value="${year}">${year}</option>`;
+                }
+                
+                intervalTypeFilter.innerHTML = `<option value="monthly">ماهیانه</option><option value="quarterly">فصلی</option><option value="yearly">سالیانه</option>`;
+                updatePeriodFilter();
+                
+                const currentJalaliDate = new persianDate();
+                yearFilter.value = currentJalaliDate.year();
+                periodFilter.value = currentJalaliDate.month() - 1;
+            }
 
-    intervalTypeFilter.innerHTML = `<option value="daily">روزانه</option><option value="monthly">ماهیانه</option><option value="quarterly">فصلی</option><option value="yearly">سالیانه</option>`;
+            function updatePeriodFilter() {
+                const intervalType = intervalTypeFilter.value;
+                periodFilter.innerHTML = '';
+                periodFilter.style.display = 'block';
+                if (intervalType === 'monthly') {
+                    JALALI_MONTHS.forEach((month, index) => { periodFilter.innerHTML += `<option value="${index}">${month}</option>`; });
+                } else if (intervalType === 'quarterly') {
+                    JALALI_QUARTERS.forEach((q, index) => { periodFilter.innerHTML += `<option value="${index}">${q}</option>`; });
+                } else {
+                    periodFilter.style.display = 'none';
+                }
+            }
 
-    // تنظیم پیش‌فرض روی ماه و سال جاری - منطقه زمانی تهران
-    const currentTehranDate = new persianDate();
-    yearFilter.value = currentTehranDate.year();
-    intervalTypeFilter.value = 'monthly'; // پیش‌فرض: ماهیانه
+            function getSelectedDateRange() {
+                const jalaliYear = parseInt(yearFilter.value);
+                const interval = intervalTypeFilter.value;
+                const period = parseInt(periodFilter.value); 
+                let startDate, endDate;
 
-    // فراخوانی آپدیت برای تنظیم صحیح فیلتر ماه
-    updatePeriodFilter(); 
-    periodFilter.value = currentTehranDate.month() - 1; // انتخاب ماه جاری
-
-    // مقداردهی اولیه تقویم روزانه
-    $('#daily-date-picker').persianDatepicker({
-        format: 'YYYY/MM/DD',
-        initialValue: true,
-        onSelect: () => updateDashboardView()
-    });
-}
-
-           function updatePeriodFilter() {
-    const intervalType = intervalTypeFilter.value;
-    const yearFilterEl = document.getElementById('year-filter');
-    const periodFilterEl = document.getElementById('period-filter');
-    const dailyPickerEl = document.getElementById('daily-date-picker');
-
-    periodFilterEl.innerHTML = '';
-
-    if (intervalType === 'daily') {
-        yearFilterEl.style.display = 'none';
-        periodFilterEl.style.display = 'none';
-        dailyPickerEl.style.display = 'block';
-    } else {
-        yearFilterEl.style.display = 'block';
-        periodFilterEl.style.display = 'block';
-        dailyPickerEl.style.display = 'none';
-
-        if (intervalType === 'monthly') {
-            JALALI_MONTHS.forEach((month, index) => { periodFilterEl.innerHTML += `<option value="${index}">${month}</option>`; });
-        } else if (intervalType === 'quarterly') {
-            JALALI_QUARTERS.forEach((q, index) => { periodFilterEl.innerHTML += `<option value="${index}">${q}</option>`; });
-        } else { // yearly
-            periodFilterEl.style.display = 'none';
-        }
-    }
-}
-function getSelectedDateRange() {
-    const interval = intervalTypeFilter.value;
-    let startDate, endDate;
-
-    if (interval === 'daily') {
-        const dailyPicker = $('#daily-date-picker').data('datepicker');
-        if (dailyPicker && dailyPicker.getState().selected) {
-            const selectedUnix = dailyPicker.getState().selected.unixDate;
-            startDate = new Date(selectedUnix);
-            endDate = new Date(selectedUnix);
-        } else { // Fallback to today if nothing is selected
-            startDate = new Date();
-            endDate = new Date();
-        }
-        startDate.setHours(0, 0, 0, 0);
-        endDate.setHours(23, 59, 59, 999);
-    } else {
-        const jalaliYear = parseInt(yearFilter.value);
-        const period = parseInt(periodFilter.value);
-
-        if (interval === 'yearly') {
-            startDate = new persianDate([jalaliYear, 1, 1]).toDate();
-            const endYear = new persianDate([jalaliYear, 12, 1]);
-            endDate = new persianDate([jalaliYear, 12, endYear.daysInMonth()]).toDate();
-        } else if (interval === 'quarterly') {
-            const startMonth = period * 3 + 1;
-            const endMonth = startMonth + 2;
-            startDate = new persianDate([jalaliYear, startMonth, 1]).toDate();
-            const endMonthDate = new persianDate([jalaliYear, endMonth, 1]);
-            endDate = new persianDate([jalaliYear, endMonth, endMonthDate.daysInMonth()]).toDate();
-        } else { // monthly
-            const month = period + 1;
-            startDate = new persianDate([jalaliYear, month, 1]).toDate();
-            const endMonthDate = new persianDate([jalaliYear, month, 1]);
-            endDate = new persianDate([jalaliYear, month, endMonthDate.daysInMonth()]).toDate();
-        }
-        endDate.setHours(23, 59, 59, 999);
-    }
-
-    return { startDate, endDate };
-}
+                if (interval === 'yearly') {
+                    startDate = new persianDate([jalaliYear, 1, 1]).toDate();
+                    endDate = new persianDate([jalaliYear + 1, 1, 1]).toDate();
+                    endDate.setDate(endDate.getDate() - 1);
+                } else if (interval === 'quarterly') {
+                    const startMonth = period * 3 + 1;
+                    const endMonth = startMonth + 2;
+                    startDate = new persianDate([jalaliYear, startMonth, 1]).toDate();
+                    const endMonthDays = new persianDate([jalaliYear, endMonth, 1]).daysInMonth();
+                    endDate = new persianDate([jalaliYear, endMonth, endMonthDays]).toDate();
+                } else { // monthly
+                    const month = period + 1;
+                    startDate = new persianDate([jalaliYear, month, 1]).toDate();
+                    const endMonthDays = new persianDate([jalaliYear, month, 1]).daysInMonth();
+                    endDate = new persianDate([jalaliYear, month, endMonthDays]).toDate();
+                }
+                endDate.setHours(23, 59, 59, 999);
+                return { startDate, endDate };
+            }
 
             function filterDashboardData() {
                 const { startDate, endDate } = getSelectedDateRange();
@@ -872,69 +807,79 @@ const networkFeeProfit = settledData.reduce((sum, d) => {
         }
 
         // --- REALTIME LISTENERS ---
-   function setupRealtimeListeners() {
-    const appId = firebaseConfig.projectId;
-    const transactionsRef = collection(db, `artifacts/${appId}/public/data/transactions`);
-    const usersRef = collection(db, `artifacts/${appId}/public/data/users`);
-    const rolesRef = collection(db, `artifacts/${appId}/public/data/roles`);
-    const suppliersRef = collection(db, `artifacts/${appId}/public/data/suppliers`);
+        function setupRealtimeListeners() {
+            const appId = firebaseConfig.projectId;
+            const transactionsRef = collection(db, `artifacts/${appId}/public/data/transactions`);
+            const usersRef = collection(db, `artifacts/${appId}/public/data/users`);
+            const rolesRef = collection(db, `artifacts/${appId}/public/data/roles`);
+            const suppliersRef = collection(db, `artifacts/${appId}/public/data/suppliers`);
 
-    if (unsubscribeTransactions) unsubscribeTransactions();
-    unsubscribeTransactions = onSnapshot(transactionsRef, (snapshot) => {
-        ALL_TRANSACTIONS = snapshot.docs.map(doc => {
-            const data = doc.data();
-            let dateObject = data.orderdate && data.orderdate.toDate ? data.orderdate.toDate() : new Date(data.orderdate);
-            if (isNaN(dateObject)) dateObject = new Date();
-            const processedHistory = (data.editHistory || []).map(entry => ({...entry, timestamp: entry.timestamp?.toDate ? entry.timestamp.toDate() : new Date(entry.timestamp) }));
-            return { ...data, id: doc.id, orderdate: dateObject, editHistory: processedHistory };
-        });
-        populateCurrencyFilter();
-        if (isProcessingPools) return;
-        processAllTransactionsForPools().then(() => {
-            if(appInitialized) {
-                filterAndRenderTransactions();
-                updateDashboardView();
-                renderPoolsTable();
-            }
-        });
-    });
+            if (unsubscribeTransactions) unsubscribeTransactions();
+            unsubscribeTransactions = onSnapshot(transactionsRef, (snapshot) => {
+                ALL_TRANSACTIONS = snapshot.docs.map(doc => {
+                    const data = doc.data();
+                    
+                    let dateObject = null;
+                    if (data.orderdate && typeof data.orderdate.toDate === 'function') {
+                        dateObject = data.orderdate.toDate();
+                    } else if (data.orderdate) {
+                        dateObject = new Date(data.orderdate);
+                    }
+                    if (!dateObject || isNaN(dateObject)) {
+                        console.error("Invalid date format for transaction ID:", doc.id, data);
+                        dateObject = new Date();
+                    }
+                    
+                    const processedHistory = (data.editHistory || []).map(entry => {
+                        if (entry.timestamp && typeof entry.timestamp.toDate === 'function') {
+                            return { ...entry, timestamp: entry.timestamp.toDate() };
+                        }
+                        return entry;
+                    });
 
-    if (unsubscribeUsers) unsubscribeUsers();
-    unsubscribeUsers = onSnapshot(usersRef, (snapshot) => {
-        users = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        if (appInitialized) renderUsersTable();
-    });
+                    return { ...data, id: doc.id, orderdate: dateObject, editHistory: processedHistory };
+                });
+populateCurrencyFilter(); // <-- این خط جدید است
+                
+                if (isProcessingPools) {
+                    console.log("Pool processing is already running, skipping this update.");
+                    return;
+                }
+                
+                processAllTransactionsForPools().then(() => {
+                    if(appInitialized) {
+                        filterAndRenderTransactions();
+                        updateDashboardView();
+                        renderPoolsTable();
+                    }
+                });
+            });
 
-    if (unsubscribeRoles) unsubscribeRoles();
-    unsubscribeRoles = onSnapshot(rolesRef, (snapshot) => {
-        roles = {};
-        snapshot.docs.forEach(doc => { roles[doc.id] = { id: doc.id, ...doc.data() }; });
-        if (appInitialized) { renderRolesSection(); applyPermissions(); }
-    });
+            if (unsubscribeUsers) unsubscribeUsers();
+            unsubscribeUsers = onSnapshot(usersRef, (snapshot) => {
+                users = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                if (appInitialized) renderUsersTable();
+            });
 
-    if (unsubscribeSuppliers) unsubscribeSuppliers();
-    unsubscribeSuppliers = onSnapshot(suppliersRef, (snapshot) => {
-        ALL_SUPPLIERS = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        if (appInitialized) { renderSuppliersTable(); filterAndRenderTransactions(); }
-    });
+            if (unsubscribeRoles) unsubscribeRoles();
+            unsubscribeRoles = onSnapshot(rolesRef, (snapshot) => {
+                roles = {};
+                snapshot.docs.forEach(doc => { roles[doc.id] = { id: doc.id, ...doc.data() }; });
+                if (appInitialized) {
+                    renderRolesSection();
+                    applyPermissions();
+                }
+            });
 
-    // Listener نهایی برای خواندن اهداف
-    const targetsRef = collection(db, `artifacts/${appId}/public/data/kpi_targets`);
-    onSnapshot(targetsRef, (snapshot) => {
-        KPI_TARGETS = {};
-        snapshot.docs.forEach(doc => {
-            KPI_TARGETS[doc.id] = doc.data();
-        });
-        if (appInitialized) {
-            if (document.getElementById('page-dashboard').classList.contains('active')) {
-                updateDashboardView();
-            }
-            if (document.getElementById('page-targets').classList.contains('active')) {
-                renderTargetsPage();
-            }
+            if (unsubscribeSuppliers) unsubscribeSuppliers();
+            unsubscribeSuppliers = onSnapshot(suppliersRef, (snapshot) => {
+                ALL_SUPPLIERS = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                if (appInitialized) {
+                    renderSuppliersTable();
+                    filterAndRenderTransactions(); 
+                }
+            });
         }
-    });
-}
         
         // --- DATA PROCESSING ---
 async function processAllTransactionsForPools() {
@@ -1090,7 +1035,6 @@ async function processAllTransactionsForPools() {
             document.getElementById(`page-${pageId}`).classList.add('active');
             if (pageId === 'pools') renderPoolsTable();
             if (pageId === 'suppliers') renderSuppliersTable();
-if (pageId === 'targets') renderTargetsPage();
             if (pageId === 'users') { renderUsersTable(); renderRolesSection(); }
         }
         navLinks.forEach(link => link.addEventListener('click', (e) => {
@@ -2153,85 +2097,7 @@ function populateCurrencyFilter() {
             }
         }
 
-        // ========== کد جدید را اینجا، قبل از خط init() کپی کنید ==========
-
-// لیستی از KPIهایی که می‌خواهیم برایشان هدف تعریف کنیم
-const TARGETABLE_KPIS = [
-    { id: 'kpi-net-profit', label: 'سود خالص (نهایی شده)' },
-    { id: 'kpi-sales-volume', label: 'حجم کل فروش به مشتری' },
-    { id: 'kpi-sales-count', label: 'تعداد فروش به مشتری' },
-    { id: 'kpi-network-fee-profit', label: 'سود کارمزد شبکه' }
-];
-
-function renderTargetsPage() {
-    const container = document.getElementById('targets-container');
-    if (!container) return;
-    container.innerHTML = '';
-
-    TARGETABLE_KPIS.forEach(kpi => {
-        const kpiTargets = KPI_TARGETS[kpi.id] || {};
-        const card = document.createElement('div');
-        card.className = 'glass-card p-6 rounded-2xl flex flex-col gap-4';
-        card.innerHTML = `
-            <h3 class="text-lg font-semibold text-cyan-400">${kpi.label}</h3>
-            <div class="space-y-3">
-                <div>
-                    <label for="${kpi.id}-daily" class="text-sm text-slate-400">هدف روزانه</label>
-                    <input type="number" id="${kpi.id}-daily" value="${kpiTargets.daily || ''}" placeholder="مثلا: 1500000" class="mt-1 bg-slate-800/50 border border-slate-700 text-slate-300 text-sm rounded-lg block w-full p-2.5">
-                </div>
-                <div>
-                    <label for="${kpi.id}-monthly" class="text-sm text-slate-400">هدف ماهانه</label>
-                    <input type="number" id="${kpi.id}-monthly" value="${kpiTargets.monthly || ''}" placeholder="مثلا: 50000000" class="mt-1 bg-slate-800/50 border border-slate-700 text-slate-300 text-sm rounded-lg block w-full p-2.5">
-                </div>
-                <div>
-                    <label for="${kpi.id}-quarterly" class="text-sm text-slate-400">هدف فصلی</label>
-                    <input type="number" id="${kpi.id}-quarterly" value="${kpiTargets.quarterly || ''}" placeholder="مثلا: 150000000" class="mt-1 bg-slate-800/50 border border-slate-700 text-slate-300 text-sm rounded-lg block w-full p-2.5">
-                </div>
-                <div>
-                    <label for="${kpi.id}-yearly" class="text-sm text-slate-400">هدف سالیانه</label>
-                    <input type="number" id="${kpi.id}-yearly" value="${kpiTargets.yearly || ''}" placeholder="مثلا: 600000000" class="mt-1 bg-slate-800/50 border border-slate-700 text-slate-300 text-sm rounded-lg block w-full p-2.5">
-                </div>
-            </div>
-            <button class="save-target-btn mt-4 w-full text-white bg-cyan-600 hover:bg-cyan-700 font-medium rounded-lg text-sm px-5 py-2.5 text-center" data-kpi-id="${kpi.id}">ذخیره تغییرات</button>
-        `;
-        container.appendChild(card);
-    });
-
-    document.querySelectorAll('.save-target-btn').forEach(btn => {
-        btn.addEventListener('click', handleTargetSave);
-    });
-}
-
-async function handleTargetSave(event) {
-    const kpiId = event.target.dataset.kpiId;
-    const targets = {
-        daily: parseFloat(document.getElementById(`${kpiId}-daily`).value) || 0,
-        monthly: parseFloat(document.getElementById(`${kpiId}-monthly`).value) || 0,
-        quarterly: parseFloat(document.getElementById(`${kpiId}-quarterly`).value) || 0,
-        yearly: parseFloat(document.getElementById(`${kpiId}-yearly`).value) || 0,
-    };
-    
-    event.target.textContent = 'در حال ذخیره...';
-    event.target.disabled = true;
-
-    try {
-        const appId = firebaseConfig.projectId;
-        const targetRef = doc(db, `artifacts/${appId}/public/data/kpi_targets`, kpiId);
-        await setDoc(targetRef, targets, { merge: true });
-        event.target.textContent = 'با موفقیت ذخیره شد!';
-    } catch (error) {
-        console.error("Error saving target:", error);
-        event.target.textContent = 'خطا در ذخیره‌سازی';
-    } finally {
-        setTimeout(() => {
-            event.target.textContent = 'ذخیره تغییرات';
-            event.target.disabled = false;
-        }, 2000);
-    }
-}
-// ===================================================================
-
-init();
+        init();
            // ========== کد جدید را دقیقا اینجا اضافه کنید ==========
         window.firebaseTools = {
             db,
