@@ -884,13 +884,13 @@ async function processAllTransactionsForPools() {
                 
                 const fifoPools = {};
                 const pendingSalesQueues = {};
-                const transactionLogs = {}; // آبجکت جدید برای نگهداری لاگ‌ها
+                const transactionLogs = {};
 
                 const allCurrencySlugs = [...new Set(sortedTransactions.map(t => t.currencie_slug).filter(Boolean))];
                 allCurrencySlugs.forEach(slug => {
                     fifoPools[slug] = [];
                     pendingSalesQueues[slug] = [];
-                    transactionLogs[slug] = []; // مقداردهی اولیه لاگ برای هر ارز
+                    transactionLogs[slug] = [];
                 });
 
                 for (const t of sortedTransactions) {
@@ -905,7 +905,6 @@ async function processAllTransactionsForPools() {
                         currentQueue.push(t);
                     } else {
                         currentPool.push({ qty: t.currency_amount, cost: t.currency_price });
-                        // افزودن خرید به لاگ
                         currentLog.push({ date: t.orderdate, amount: t.currency_amount, orderid: t.orderid, type: 'واریز', rate: t.currency_price });
                         if (t.NetProfit !== 0 || t.costBasisStatus !== 'settled') {
                             updatesBatch.update(doc(db, `artifacts/${firebaseConfig.projectId}/public/data/transactions`, t.id), { NetProfit: 0, costBasisStatus: 'settled', Cost_Basis: t.currency_price });
@@ -913,13 +912,19 @@ async function processAllTransactionsForPools() {
                         }
                     }
 
+                    // --- بخش کلیدی جدید: پردازش صف با اولویت حداکثر فروش ---
                     let queueChanged = true;
                     while(queueChanged && currentQueue.length > 0) {
                         queueChanged = false;
                         const availableQty = currentPool.reduce((sum, layer) => sum + layer.qty, 0);
-                        const nextSale = currentQueue[0];
 
-                        if (availableQty >= nextSale.currency_amount) {
+                        // پیدا کردن اولین سفارشی در صف که قابل انجام است
+                        const fulfillableOrderIndex = currentQueue.findIndex(sale => availableQty >= sale.currency_amount);
+
+                        if (fulfillableOrderIndex > -1) {
+                            // اگر سفارشی پیدا شد، آن را از صف خارج کرده و پردازش کن
+                            const nextSale = currentQueue.splice(fulfillableOrderIndex, 1)[0];
+                            
                             let saleAmount = nextSale.currency_amount;
                             let totalCostForThisSale = 0;
                             for (const layer of currentPool) {
@@ -929,24 +934,19 @@ async function processAllTransactionsForPools() {
                                 layer.qty -= amountFromThisLayer;
                                 saleAmount -= amountFromThisLayer;
                             }
-
                             while (currentPool.length > 0 && currentPool[0].qty <= 0) {
                                 currentPool.shift();
                             }
-
                             const newCostBasis = nextSale.currency_amount > 0 ? totalCostForThisSale / nextSale.currency_amount : 0;
                             const actualNetworkWageToman = (nextSale['ActualNetwork Wage'] || 0) * nextSale.currency_price;
                             const newNetProfit = nextSale.Total_Amount - (totalCostForThisSale + actualNetworkWageToman);
-
-                            // افزودن فروش به لاگ
-                            currentLog.push({ date: nextSale.orderdate, amount: nextSale.currency_amount, orderid: nextSale.orderid, type: 'برداشت', rate: newCostBasis });
                             
+                            currentLog.push({ date: nextSale.orderdate, amount: nextSale.currency_amount, orderid: nextSale.orderid, type: 'برداشت', rate: newCostBasis });
                             if (nextSale.Cost_Basis !== newCostBasis || nextSale.NetProfit !== newNetProfit || nextSale.costBasisStatus !== 'settled') {
                                 updatesBatch.update(doc(db, `artifacts/${firebaseConfig.projectId}/public/data/transactions`, nextSale.id), { costBasisStatus: 'settled', Cost_Basis: newCostBasis, NetProfit: newNetProfit });
                                 updatesNeeded = true;
                             }
-                            currentQueue.shift();
-                            queueChanged = true;
+                            queueChanged = true; // چون یک سفارش انجام شد، حلقه را تکرار کن
                         }
                     }
                 }
@@ -966,7 +966,6 @@ async function processAllTransactionsForPools() {
                     const finalPoolQty = finalPool.reduce((sum, layer) => sum + layer.qty, 0);
                     const finalPoolValue = finalPool.reduce((sum, layer) => sum + (layer.qty * layer.cost), 0);
                     const finalAvgCost = finalPoolQty > 0 ? finalPoolValue / finalPoolQty : 0;
-                    // انتساب لاگ ساخته شده به آبجکت نهایی
                     currencyPools[slug] = { 
                         quantity: finalPoolQty, 
                         weightedAvgCost: finalAvgCost, 
