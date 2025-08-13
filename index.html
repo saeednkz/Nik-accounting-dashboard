@@ -133,6 +133,12 @@
                     <svg class="h-6 w-6 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m-7.5-2.962a3.75 3.75 0 015.962 0zM12 6.75a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z" /></svg>
                     <span class="mr-4 opacity-0 max-w-0 group-hover:opacity-100 group-hover:max-w-full transition-all duration-300 whitespace-nowrap overflow-hidden">تامین‌کنندگان</span>
                 </a>
+                <a href="#" id="nav-targets" class="nav-link flex items-center p-3 rounded-lg text-slate-400 hover:bg-slate-700/50">
+    <svg class="h-6 w-6 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M10.125 2.25h-4.5c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125v-9M10.125 2.25h.375a9 9 0 019 9v.375M10.125 2.25c3.866 0 7.5 3.134 7.5 7.5v.375m-7.5-7.875L7.5 15l4.5-3L15 15l-2.625-7.875" />
+    </svg>
+    <span class="mr-4 opacity-0 max-w-0 group-hover:opacity-100 group-hover:max-w-full transition-all duration-300 whitespace-nowrap overflow-hidden">مدیریت اهداف</span>
+</a>
                  <a href="#" id="nav-users" class="nav-link flex items-center p-3 rounded-lg text-slate-400 hover:bg-slate-700/50">
                     <svg class="h-6 w-6 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-4.663M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0z" /></svg>
                     <span class="mr-4 opacity-0 max-w-0 group-hover:opacity-100 group-hover:max-w-full transition-all duration-300 whitespace-nowrap overflow-hidden">مدیریت کاربران</span>
@@ -350,6 +356,17 @@
                     </div>
                 </div>
             </div>
+            </div>
+
+<div id="page-targets" class="page-content">
+    <div class="flex flex-col h-full">
+        <header class="flex-shrink-0 flex flex-wrap items-center justify-between gap-4 mb-6">
+            <h2 class="text-3xl font-bold text-slate-100">مدیریت اهداف KPI</h2>
+        </header>
+        <div id="targets-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            </div>
+    </div>
+</div>
         </main>
     </div>
 
@@ -1066,6 +1083,7 @@ async function processAllTransactionsForPools() {
             document.getElementById(`page-${pageId}`).classList.add('active');
             if (pageId === 'pools') renderPoolsTable();
             if (pageId === 'suppliers') renderSuppliersTable();
+if (pageId === 'targets') renderTargetsPage();
             if (pageId === 'users') { renderUsersTable(); renderRolesSection(); }
         }
         navLinks.forEach(link => link.addEventListener('click', (e) => {
